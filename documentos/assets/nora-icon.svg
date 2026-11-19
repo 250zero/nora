@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <!-- Background Gradient -->
+    <linearGradient id="bg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0F172A" />
+      <stop offset="50%" stop-color="#0B0F19" />
+      <stop offset="100%" stop-color="#050811" />
+    </linearGradient>
+
+    <!-- N Left Pillar Gradient -->
+    <linearGradient id="n-left" x1="0%" y1="100%" x2="0%" y2="0%">
+      <stop offset="0%" stop-color="#1D4ED8" />
+      <stop offset="100%" stop-color="#38BDF8" />
+    </linearGradient>
+
+    <!-- N Diagonal Gradient (Dynamic Electric Flow) -->
+    <linearGradient id="n-diag" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38BDF8" />
+      <stop offset="45%" stop-color="#2563EB" />
+      <stop offset="85%" stop-color="#7C3AED" />
+      <stop offset="100%" stop-color="#A855F7" />
+    </linearGradient>
+
+    <!-- N Right Pillar Gradient -->
+    <linearGradient id="n-right" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#C084FC" />
+      <stop offset="100%" stop-color="#7C3AED" />
+    </linearGradient>
+
+    <!-- Sparkle Glow -->
+    <radialGradient id="sparkle-glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#38BDF8" stop-opacity="0.9" />
+      <stop offset="40%" stop-color="#818CF8" stop-opacity="0.4" />
+      <stop offset="100%" stop-color="#818CF8" stop-opacity="0" />
+    </radialGradient>
+
+    <!-- Glass Rim Filter -->
+    <filter id="soft-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#1D4ED8" flood-opacity="0.35" />
+    </filter>
+  </defs>
+
+  <!-- Base Rounded Squircle Background -->
+  <rect width="512" height="512" rx="128" fill="url(#bg-grad)" />
+  <rect width="508" height="508" x="2" y="2" rx="126" fill="none" stroke="#334155" stroke-width="2" stroke-opacity="0.4" />
+
+  <!-- Background Ambient Glow behind Logo -->
+  <circle cx="256" cy="256" r="150" fill="#2563EB" opacity="0.15" filter="blur(40px)" />
+  <circle cx="340" cy="180" r="100" fill="#A855F7" opacity="0.2" filter="blur(35px)" />
+
+  <!-- Logo Group -->
+  <g filter="url(#soft-shadow)" transform="translate(0, 4)">
+    <!-- Left Vertical Stem -->
+    <path d="M152 148 C152 134.7 162.7 124 176 124 C189.3 124 200 134.7 200 148 L200 364 C200 377.3 189.3 388 176 388 C162.7 388 152 377.3 152 364 Z" 
+          fill="url(#n-left)" />
+
+    <!-- Diagonal Dynamic Stroke -->
+    <path d="M176 124 C186 124 195 130 199 139 L315 338 C318 344 325 348 333 348 C342 348 350 342 352 333 L358 290 C360 278 371 270 383 272 C395 274 403 285 401 297 L390 358 C385 376 369 388 350 388 C334 388 319 379 311 366 L195 167 C192 161 185 157 177 157 C168 157 160 163 158 172 L152 215 C150 227 139 235 127 233 C115 231 107 220 109 208 L120 147 C125 129 141 124 176 124 Z" 
+          fill="url(#n-diag)" opacity="0.95" />
+
+    <!-- Right Vertical Stem -->
+    <path d="M312 176 C312 162.7 322.7 152 336 152 C349.3 152 360 162.7 360 176 L360 364 C360 377.3 349.3 388 336 388 C322.7 388 312 377.3 312 364 Z" 
+          fill="url(#n-right)" />
+
+    <!-- AI Sparkle Orbit Glow (Top Right) -->
+    <circle cx="360" cy="144" r="54" fill="url(#sparkle-glow)" />
+
+    <!-- 4-Point AI Intelligence Star -->
+    <path d="M360 114 Q360 144 330 144 Q360 144 360 174 Q360 144 390 144 Q360 144 360 114 Z" 
+          fill="#FFFFFF" />
+    <circle cx="360" cy="144" r="3" fill="#38BDF8" />
+
+    <!-- Subtle Connection Node on Left -->
+    <circle cx="176" cy="364" r="8" fill="#38BDF8" />
+  </g>
+</svg>

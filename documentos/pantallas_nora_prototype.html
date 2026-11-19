@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nora — Prototipo Interactivo v2</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            nora: {
+              bgDark: '#0B0F19',
+              cardDark: '#151D2C',
+              surfaceDark: '#1E293B',
+              borderDark: '#222F43',
+              primary: '#2563EB',
+              primaryHover: '#1D4ED8',
+              aiSpark: '#A855F7',
+              aiGlow: '#38BDF8',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+    .calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans min-h-screen p-2 md:p-6 flex flex-col items-center">
+
+  <!-- TOP TOOLBAR: NAVEGACIÓN Y CONFIGURACIÓN -->
+  <header class="w-full max-w-5xl mb-4 flex flex-wrap items-center justify-between gap-3 bg-slate-900/90 border border-slate-800 p-3 rounded-2xl backdrop-blur-md shadow-xl">
+    <div class="flex items-center gap-3">
+      <!-- Nora Logo -->
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-700 via-indigo-600 to-purple-600 flex items-center justify-center shadow-lg shadow-blue-600/30 font-bold text-xl text-white">
+        N
+      </div>
+      <div>
+        <h1 class="text-base font-bold flex items-center gap-1.5 text-white">
+          Nora <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30">PWA v2.0</span>
+        </h1>
+        <p class="text-xs text-slate-400">Prototipo con correcciones: Sin FAB, multi-horario IA, detalle estándar y auditoría paginada</p>
+      </div>
+    </div>
+
+    <!-- Navegación entre Pantallas -->
+    <nav class="flex items-center gap-1 bg-slate-950/80 p-1 rounded-xl border border-slate-800 text-xs font-medium">
+      <button onclick="switchScreen('agenda')" id="tab-agenda" class="tab-btn px-3 py-1.5 rounded-lg bg-blue-600 text-white font-semibold transition">
+        📅 Agenda
+      </button>
+      <button onclick="switchScreen('chat')" id="tab-chat" class="tab-btn px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition">
+        ✨ Asistente IA
+      </button>
+      <button onclick="switchScreen('usuarios')" id="tab-usuarios" class="tab-btn px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition">
+        👥 Usuarios (Admin)
+      </button>
+      <button onclick="switchScreen('auditoria')" id="tab-auditoria" class="tab-btn px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition">
+        🛡️ Auditoría (Admin)
+      </button>
+      <button onclick="switchScreen('iconos')" id="tab-iconos" class="tab-btn px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition">
+        🎨 Iconos Nora
+      </button>
+    </nav>
+
+    <!-- Theme & Role Controls -->
+    <div class="flex items-center gap-2">
+      <button onclick="toggleTheme()" id="btn-theme" class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs flex items-center gap-1.5 transition text-slate-200">
+        <span id="theme-icon">🌙</span> <span id="theme-text">Modo Oscuro</span>
+      </button>
+      <button onclick="toggleRole()" id="btn-role" class="px-2.5 py-1.5 rounded-lg bg-indigo-950/80 hover:bg-indigo-900 border border-indigo-700/50 text-indigo-300 text-xs font-semibold flex items-center gap-1 transition">
+        👑 Rol: <span id="role-label">Supervisor (Admin)</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- MARCO DE CELULAR (VIEWPORT PWA 390px) -->
+  <main class="relative w-full max-w-[410px] bg-[#0B0F19] border-[6px] border-slate-800 rounded-[44px] shadow-2xl overflow-hidden flex flex-col h-[790px]" id="app-viewport">
+    
+    <!-- Barra de Estado Móvil -->
+    <div class="w-full px-6 pt-3 pb-1 flex justify-between items-center text-[11px] font-semibold text-slate-400 select-none bg-transparent z-10">
+      <span>1:25 p.m.</span>
+      <div class="w-20 h-4 bg-slate-900 rounded-full border border-slate-800/60"></div>
+      <div class="flex items-center gap-1.5">
+        <span>📶</span>
+        <span>VoLTE</span>
+        <span class="text-xs">🔋 47%</span>
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- PANTALLA 1: AGENDA / CALENDARIO (SIN BOTÓN ADD) -->
+    <!-- ========================================== -->
+    <div id="screen-agenda" class="screen-view flex-1 flex flex-col overflow-hidden">
+      
+      <!-- Top App Bar -->
+      <div class="px-4 py-2 flex items-center justify-between border-b border-slate-800/80 bg-[#0B0F19]/90 backdrop-blur-sm">
+        <div class="flex items-center gap-2.5">
+          <button class="text-slate-400 hover:text-white p-1">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+          </button>
+          <div class="flex items-center gap-1 cursor-pointer">
+            <h2 class="font-bold text-base text-slate-100">Noviembre</h2>
+            <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button class="text-slate-400 hover:text-white p-1">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+          </button>
+          <div class="w-6 h-6 rounded-md border border-slate-700 flex items-center justify-center text-[11px] font-bold text-slate-200">
+            19
+          </div>
+          <!-- Acceso directo al Asistente IA desde la barra superior -->
+          <button onclick="switchScreen('chat')" class="px-2 py-0.5 rounded-full bg-purple-600/30 border border-purple-500/50 text-purple-300 flex items-center gap-1 text-[10px] font-bold hover:bg-purple-600/50 transition">
+            ✨ Nora
+          </button>
+          <!-- Avatar Usuario -->
+          <div class="w-7 h-7 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-xs font-bold text-white border border-slate-700">
+            R
+          </div>
+        </div>
+      </div>
+
+      <!-- Granularidad: Día | Semana | Mes + Filtro Admin de Usuario -->
+      <div class="px-4 py-2 flex items-center justify-between gap-2 border-b border-slate-800/60 bg-[#111726]">
+        <div class="flex items-center bg-slate-900/90 rounded-lg p-0.5 border border-slate-800 text-[11px] font-medium w-full max-w-[200px]">
+          <button class="flex-1 py-1 text-center rounded-md text-slate-400 hover:text-white">Día</button>
+          <button class="flex-1 py-1 text-center rounded-md text-slate-400 hover:text-white">Semana</button>
+          <button class="flex-1 py-1 text-center rounded-md bg-blue-600 text-white font-semibold shadow-sm">Mes</button>
+        </div>
+
+        <div id="admin-user-filter" class="flex-1 flex justify-end">
+          <select class="bg-slate-900 border border-slate-800 text-slate-300 text-[11px] rounded-lg px-2 py-1 focus:ring-1 focus:ring-blue-500 outline-none">
+            <option>👥 Todo el equipo</option>
+            <option>👤 Juan Pérez</option>
+            <option>👤 Ana Martínez</option>
+            <option>⭐ Mis tareas</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Cabecera Días de Semana -->
+      <div class="calendar-grid text-center py-1.5 border-b border-slate-800/60 text-[11px] font-semibold text-slate-400 bg-[#0B0F19]">
+        <div>dom</div>
+        <div>lun</div>
+        <div>mar</div>
+        <div>mié</div>
+        <div class="text-blue-400 font-bold">jue</div>
+        <div>vie</div>
+        <div>sáb</div>
+      </div>
+
+      <!-- Cuadrícula del Mes (Sin botón ADD flotante) -->
+      <div class="flex-1 overflow-y-auto calendar-grid divide-x divide-y divide-slate-800/40 text-[10px]">
+        <!-- Fila 1 -->
+        <div class="min-h-[85px] p-1 flex flex-col bg-[#0B0F19]"><span class="text-slate-500 font-medium">1</span><span class="mt-1 px-1 py-0.5 rounded bg-cyan-950/80 text-cyan-300 border border-cyan-800/50 truncate">Cambio d...</span></div>
+        <div class="min-h-[85px] p-1 flex flex-col bg-[#0B0F19]"><span class="text-slate-500 font-medium">2</span></div>
+        <div class="min-h-[85px] p-1 flex flex-col bg-[#0B0F19]"><span class="text-slate-500 font-medium">3</span><span class="mt-1 px-1 py-0.5 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-800/50 truncate">Eleccione...</span></div>
+        <div class="min-h-[85px] p-1 flex flex-col bg-[#0B0F19]"><span class="text-slate-500 font-medium">4</span><span class="mt-1 px-1 py-0.5 rounded bg-blue-950/80 text-blue-300 border border-blue-800/50 truncate">Daily de E...</span></div>
+        <div class="min-h-[85px] p-1 flex flex-col bg-[#0B0F19]"><span class="text-slate-500 font-medium">5</span></div>
+        <div class="min-h-[85px] p-1 flex flex-col bg-[#0B0F19]"><span class="text-slate-500 font-medium">6</span><span class="mt-1 px-1 py-0.5 rounded bg-cyan-950/80 text-cyan-300 border border-cyan-800/50 truncate">Día de la C...</span><span class="mt-0.5 px-1 py-0.5 rounded bg-blue-950/80 text-blue-300 border border-blue-800/50 truncate">Daily de E...</span></div>
+        <div class="min-h-[85px] p-1 flex flex-col bg-[#0B0F19]"><span class="text-slate-500 font-medium">7</span></div>
+
+        <!-- Fila 2 -->
+        <div class="min-h-[85px] p-1 flex flex-col bg-[#0B0F19]"><span class="text-slate-500 font-medium">8</span></div>
+        <div class="min-h-[85px] p-1 flex flex-col bg-[#0B0F19]"><span class="text-slate-500 font-medium">9</span><span class="mt-1 px-1 py-0.5 rounded bg-cyan-950/80 text-cyan-300 border border-cyan-800/50 truncate">Día de la C...</span></div>
+        <div class="min-h-[85px] p-1 flex flex-col bg-[#0B0F19]"><span class="text-slate-500 font-medium">10</span></div>
+        <div class="min-h-[85px] p-1 flex flex-col bg-[#0B0F19]"><span class="text-slate-500 font-medium">11</span><span class="mt-1 px-1 py-0.5 rounded bg-cyan-950/80 text-cyan-300 border border-cyan-800/50 truncate">Día del Ve...</span><span class="mt-0.5 px-1 py-0.5 rounded bg-blue-950/80 text-blue-300 border border-blue-800/50 truncate">Daily de E...</span></div>
+        <div class="min-h-[85px] p-1 flex flex-col bg-[#0B0F19]"><span class="text-slate-500 font-medium">12</span></div>
+        <div class="min-h-[85px] p-1 flex flex-col bg-[#0B0F19]"><span class="text-slate-500 font-medium">13</span><span class="mt-1 px-1 py-0.5 rounded bg-blue-950/80 text-blue-300 border border-blue-800/50 truncate">Daily de E...</span></div>
+        <div class="min-h-[85px] p-1 flex flex-col bg-[#0B0F19]"><span class="text-slate-500 font-medium">14</span></div>
+
+        <!-- Fila 3 (DÍA ACTUAL: 19 NOV) -->
+        <div class="min-h-[85px] p-1 flex flex-col bg-[#0B0F19]"><span class="text-slate-500 font-medium">15</span></div>
+        <div class="min-h-[85px] p-1 flex flex-col bg-[#0B0F19]"><span class="text-slate-500 font-medium">16</span></div>
+        <div class="min-h-[85px] p-1 flex flex-col bg-[#0B0F19]"><span class="text-slate-500 font-medium">17</span></div>
+        <div class="min-h-[85px] p-1 flex flex-col bg-[#0B0F19]"><span class="text-slate-500 font-medium">18</span><span class="mt-1 px-1 py-0.5 rounded bg-blue-950/80 text-blue-300 border border-blue-800/50 truncate">Daily de E...</span></div>
+        <!-- 19 NOV: Clic abre Modal Estándar de Tarea -->
+        <div onclick="openStandardTaskModal('Cotización a Ana', 'Alta', '2026-11-20', '10:00 AM', 'Ana Martínez', 'Roberto Admin', 'Asistente IA')" 
+             class="min-h-[85px] p-1 flex flex-col bg-blue-950/20 border-blue-500/30 cursor-pointer hover:bg-blue-900/30 transition">
+          <span class="w-5 h-5 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center text-[10px] shadow-sm">19</span>
+          <span class="mt-1 px-1 py-0.5 rounded bg-amber-950/90 text-amber-300 border border-amber-800/50 font-semibold truncate">Cotización Ana ℹ️</span>
+        </div>
+        <div onclick="openStandardTaskModal('Cobrar a Juan', 'Media', '2026-11-27', '03:00 PM', 'Juan Pérez', 'Roberto Admin', 'Asistente IA')"
+             class="min-h-[85px] p-1 flex flex-col bg-[#0B0F19] cursor-pointer hover:bg-slate-900 transition">
+          <span class="text-slate-500 font-medium">20</span>
+          <span class="mt-1 px-1 py-0.5 rounded bg-red-950/90 text-red-300 border border-red-800/50 font-semibold truncate">Cobrar Juan ℹ️</span>
+          <span class="mt-0.5 px-1 py-0.5 rounded bg-blue-950/80 text-blue-300 border border-blue-800/50 truncate">Daily de E...</span>
+        </div>
+        <div class="min-h-[85px] p-1 flex flex-col bg-[#0B0F19]"><span class="text-slate-500 font-medium">21</span></div>
+
+        <!-- Fila 4 -->
+        <div class="min-h-[85px] p-1 flex flex-col bg-[#0B0F19]"><span class="text-slate-500 font-medium">22</span></div>
+        <div class="min-h-[85px] p-1 flex flex-col bg-[#0B0F19]"><span class="text-slate-500 font-medium">23</span></div>
+        <div class="min-h-[85px] p-1 flex flex-col bg-[#0B0F19]"><span class="text-slate-500 font-medium">24</span></div>
+        <div class="min-h-[85px] p-1 flex flex-col bg-[#0B0F19]"><span class="text-slate-500 font-medium">25</span><span class="mt-1 px-1 py-0.5 rounded bg-blue-950/80 text-blue-300 border border-blue-800/50 truncate">Daily de E...</span></div>
+        <div class="min-h-[85px] p-1 flex flex-col bg-[#0B0F19]"><span class="text-slate-500 font-medium">26</span><span class="mt-1 px-1 py-0.5 rounded bg-cyan-950/80 text-cyan-300 border border-cyan-800/50 truncate">Día de Ac...</span></div>
+        <div class="min-h-[85px] p-1 flex flex-col bg-[#0B0F19]"><span class="text-slate-500 font-medium">27</span><span class="mt-1 px-1 py-0.5 rounded bg-cyan-950/80 text-cyan-300 border border-cyan-800/50 truncate">Viernes N...</span><span class="mt-0.5 px-1 py-0.5 rounded bg-blue-950/80 text-blue-300 border border-blue-800/50 truncate">Daily de E...</span></div>
+        <div class="min-h-[85px] p-1 flex flex-col bg-[#0B0F19]"><span class="text-slate-500 font-medium">28</span></div>
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- PANTALLA 2: ASISTENTE IA CON MÚLTIPLES HORAS LIBRES -->
+    <!-- ========================================== -->
+    <div id="screen-chat" class="screen-view hidden flex-1 flex flex-col bg-[#0B0F19]">
+      <!-- Header Chat -->
+      <div class="px-4 py-3 border-b border-slate-800 bg-[#111726] flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-purple-600 to-blue-600 flex items-center justify-center text-white text-sm shadow-md shadow-purple-600/30">
+            ✨
+          </div>
+          <div>
+            <h3 class="text-xs font-bold text-white flex items-center gap-1">
+              Nora AI <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+            </h3>
+            <p class="text-[10px] text-slate-400">Orquestador de Tareas y Agenda</p>
+          </div>
+        </div>
+        <button onclick="switchScreen('agenda')" class="text-slate-400 hover:text-white p-1 text-xs">
+          ✕ Agenda
+        </button>
+      </div>
+
+      <!-- Flujo de Mensajes -->
+      <div class="flex-1 p-3 overflow-y-auto space-y-3 text-xs">
+        <div class="flex justify-end">
+          <div class="max-w-[85%] bg-blue-600 text-white px-3.5 py-2 rounded-2xl rounded-tr-none shadow-sm leading-relaxed">
+            "Cobrar a Juan el viernes y cotización a Ana mañana, urgente"
+          </div>
+        </div>
+
+        <div class="flex gap-2">
+          <div class="w-6 h-6 rounded-full bg-purple-600/30 border border-purple-500/50 flex-shrink-0 flex items-center justify-center text-[10px] text-purple-300">
+            ✨
+          </div>
+          <div class="space-y-2 max-w-[88%]">
+            <div class="bg-[#151D2C] border border-slate-800 text-slate-200 p-3 rounded-2xl rounded-tl-none shadow-sm leading-relaxed">
+              <p class="font-semibold text-purple-300 text-[11px] mb-1.5">
+                ¡Entendido! Creé 2 tareas y analicé la disponibilidad de tu agenda:
+              </p>
+
+              <!-- Tarjeta Tarea 1 -->
+              <div class="bg-slate-900/90 border border-amber-800/40 rounded-xl p-2.5 mb-2">
+                <div class="flex items-center justify-between text-[10px] text-amber-400 font-bold mb-1">
+                  <span>🔴 PRIORIDAD ALTA</span>
+                  <span>Mañana 20-nov</span>
+                </div>
+                <h4 class="font-bold text-slate-100 text-xs">Cotización a Ana</h4>
+                <p class="text-[10px] text-slate-400">Responsable: Ana Martínez</p>
+
+                <!-- Sugerencia de Varias Horas Libres -->
+                <div class="mt-2 pt-2 border-t border-slate-800">
+                  <p class="text-[10px] text-purple-200 font-semibold mb-1.5">
+                    💡 Bloques libres detectados para mañana (selecciona una hora):
+                  </p>
+                  <div class="flex flex-wrap gap-1.5">
+                    <button onclick="selectTimeSlot('10:00 AM')" class="time-slot-btn px-2.5 py-1 rounded-lg bg-purple-900/50 border border-purple-500/50 text-purple-200 text-[10px] font-bold hover:bg-purple-600 hover:text-white transition">
+                      🕒 10:00 AM (Recomendado)
+                    </button>
+                    <button onclick="selectTimeSlot('11:30 AM')" class="time-slot-btn px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 text-[10px] hover:bg-purple-600 hover:text-white transition">
+                      🕒 11:30 AM
+                    </button>
+                    <button onclick="selectTimeSlot('04:00 PM')" class="time-slot-btn px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 text-[10px] hover:bg-purple-600 hover:text-white transition">
+                      🕒 04:00 PM
+                    </button>
+                  </div>
+                  <span id="selected-slot-feedback" class="block text-[10px] text-emerald-400 font-semibold mt-1 hidden">
+                    ✓ Hora seleccionada y confirmada en agenda: 10:00 AM
+                  </span>
+                </div>
+              </div>
+
+              <!-- Tarjeta Tarea 2 -->
+              <div class="bg-slate-900/90 border border-blue-800/40 rounded-xl p-2.5">
+                <div class="flex items-center justify-between text-[10px] text-blue-400 font-bold mb-1">
+                  <span>🔵 PRIORIDAD MEDIA</span>
+                  <span>Vie 27-nov</span>
+                </div>
+                <h4 class="font-bold text-slate-100 text-xs">Cobrar a Juan</h4>
+                <p class="text-[10px] text-slate-400">Responsable: Juan Pérez • 03:00 PM</p>
+              </div>
+
+              <div class="mt-2 text-right">
+                <button onclick="openStandardTaskModal('Cotización a Ana', 'Alta', '2026-11-20', '10:00 AM', 'Ana Martínez', 'Roberto Admin', 'Asistente IA')"
+                        class="text-[10px] text-blue-400 font-semibold hover:underline">
+                  Ver ficha estándar y trazabilidad →
+                </button>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Input Chat -->
+      <div class="p-3 border-t border-slate-800 bg-[#111726] flex items-center gap-2">
+        <button class="w-8 h-8 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center text-sm" title="Dictado por voz">
+          🎙️
+        </button>
+        <input type="text" placeholder="Escribe un pendiente o consulta..." class="flex-1 bg-slate-900 border border-slate-700/80 rounded-full px-3.5 py-1.5 text-xs text-white placeholder-slate-500 outline-none focus:border-blue-500">
+        <button class="w-8 h-8 rounded-full bg-blue-600 hover:bg-blue-500 text-white flex items-center justify-center text-xs shadow-md shadow-blue-600/40">
+          ➤
+        </button>
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- PANTALLA 3: GESTIÓN DE USUARIOS (CRUD ADMIN) -->
+    <!-- ========================================== -->
+    <div id="screen-usuarios" class="screen-view hidden flex-1 flex flex-col bg-[#0B0F19]">
+      <div class="px-4 py-3 border-b border-slate-800 bg-[#111726] flex items-center justify-between">
+        <div>
+          <h3 class="text-xs font-bold text-white flex items-center gap-1.5">
+            👥 Gestión de Usuarios
+          </h3>
+          <p class="text-[10px] text-slate-400">Equipo, asignaciones y borrado en cascada</p>
+        </div>
+        <button onclick="alert('Abriendo modal: Crear Nuevo Usuario')" class="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold text-[11px] shadow-sm">
+          + Usuario
+        </button>
+      </div>
+
+      <div class="flex-1 p-3 overflow-y-auto space-y-2.5 text-xs">
+        <div class="bg-[#151D2C] border border-slate-800 p-3 rounded-2xl">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2.5">
+              <div class="w-9 h-9 rounded-full bg-purple-600 flex items-center justify-center font-bold text-white text-xs">RA</div>
+              <div>
+                <h4 class="font-bold text-slate-100 text-xs">Roberto Admin</h4>
+                <p class="text-[10px] text-slate-400">roberto@empresa.com</p>
+              </div>
+            </div>
+            <span class="px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] font-bold">SUPERVISOR</span>
+          </div>
+          <div class="mt-2.5 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400">
+            <span>4 tareas asignadas</span>
+            <span onclick="switchScreen('agenda')" class="text-blue-400 cursor-pointer font-medium hover:underline">Ver agenda →</span>
+          </div>
+        </div>
+
+        <div class="bg-[#151D2C] border border-slate-800 p-3 rounded-2xl">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2.5">
+              <div class="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center font-bold text-white text-xs">JP</div>
+              <div>
+                <h4 class="font-bold text-slate-100 text-xs">Juan Pérez</h4>
+                <p class="text-[10px] text-slate-400">juan@empresa.com</p>
+              </div>
+            </div>
+            <span class="px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30 text-[10px] font-bold">MIEMBRO</span>
+          </div>
+          <div class="mt-2.5 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
+            <span class="text-slate-400">8 tareas activas</span>
+            <div class="flex items-center gap-1.5">
+              <button onclick="switchScreen('agenda')" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px]">
+                Tareas
+              </button>
+              <button onclick="openDeleteUserModal('Juan Pérez')" class="px-2 py-0.5 rounded bg-red-950/70 hover:bg-red-900 border border-red-800/50 text-red-300 text-[10px]">
+                Eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-[#151D2C] border border-slate-800 p-3 rounded-2xl">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2.5">
+              <div class="w-9 h-9 rounded-full bg-cyan-600 flex items-center justify-center font-bold text-white text-xs">AM</div>
+              <div>
+                <h4 class="font-bold text-slate-100 text-xs">Ana Martínez</h4>
+                <p class="text-[10px] text-slate-400">ana@empresa.com</p>
+              </div>
+            </div>
+            <span class="px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30 text-[10px] font-bold">MIEMBRO</span>
+          </div>
+          <div class="mt-2.5 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
+            <span class="text-slate-400">5 tareas activas</span>
+            <div class="flex items-center gap-1.5">
+              <button onclick="switchScreen('agenda')" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px]">
+                Tareas
+              </button>
+              <button onclick="openDeleteUserModal('Ana Martínez')" class="px-2 py-0.5 rounded bg-red-950/70 hover:bg-red-900 border border-red-800/50 text-red-300 text-[10px]">
+                Eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- PANTALLA 4: AUDITORÍA (FILTRO USUARIO + PAGINADO + SOLO ADMIN) -->
+    <!-- ========================================== -->
+    <div id="screen-auditoria" class="screen-view hidden flex-1 flex flex-col bg-[#0B0F19]">
+      <div class="px-4 py-3 border-b border-slate-800 bg-[#111726]">
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="text-xs font-bold text-white flex items-center gap-1.5">
+            🛡️ Auditoría Transaccional
+          </h3>
+          <span class="text-[9px] px-1.5 py-0.5 rounded bg-purple-900/40 text-purple-300 border border-purple-700/50 font-bold">SOLO ADMIN</span>
+        </div>
+
+        <div class="flex gap-2 text-[10px]">
+          <select id="audit-filter-user" onchange="filterAuditLogs()" class="flex-1 bg-slate-900 border border-slate-800 text-slate-300 rounded-lg px-2 py-1 outline-none">
+            <option value="all">👤 Todos los usuarios</option>
+            <option value="roberto">Roberto Admin</option>
+            <option value="juan">Juan Pérez</option>
+            <option value="ana">Ana Martínez</option>
+          </select>
+          <select class="bg-slate-900 border border-slate-800 text-slate-300 rounded-lg px-2 py-1 outline-none">
+            <option>Todas las operaciones</option>
+            <option>INSERT</option>
+            <option>UPDATE</option>
+            <option>DELETE</option>
+            <option>SELECT</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="flex-1 p-3 overflow-y-auto space-y-2 text-xs" id="audit-log-container">
+        <div class="audit-item bg-[#151D2C] border border-slate-800 p-2.5 rounded-xl" data-user="roberto">
+          <div class="flex items-center justify-between text-[10px] mb-1">
+            <span class="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-bold border border-emerald-500/30">INSERT</span>
+            <span class="text-slate-500 font-mono">1:24:10 p.m.</span>
+          </div>
+          <p class="text-slate-200 font-semibold text-[11px]">public.tasks (Cotización a Ana)</p>
+          <div class="flex justify-between items-center text-[10px] text-slate-400 mt-1">
+            <span>Usuario: Roberto Admin</span>
+            <span class="text-[9px] text-slate-500 font-mono">ID: a1f8...3c0</span>
+          </div>
+        </div>
+
+        <div class="audit-item bg-[#151D2C] border border-slate-800 p-2.5 rounded-xl" data-user="roberto">
+          <div class="flex items-center justify-between text-[10px] mb-1">
+            <span class="px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400 font-bold border border-purple-500/30">SELECT</span>
+            <span class="text-slate-500 font-mono">1:23:45 p.m.</span>
+          </div>
+          <p class="text-slate-200 font-semibold text-[11px]">Inspección: Agenda de Juan Pérez</p>
+          <div class="flex justify-between items-center text-[10px] text-slate-400 mt-1">
+            <span>Usuario: Roberto Admin</span>
+            <span class="text-purple-400 text-[9px]">Consulta Supervisada</span>
+          </div>
+        </div>
+
+        <div class="audit-item bg-[#151D2C] border border-slate-800 p-2.5 rounded-xl" data-user="juan">
+          <div class="flex items-center justify-between text-[10px] mb-1">
+            <span class="px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 font-bold border border-blue-500/30">UPDATE</span>
+            <span class="text-slate-500 font-mono">1:19:02 p.m.</span>
+          </div>
+          <p class="text-slate-200 font-semibold text-[11px]">public.tasks (Estado: en_progreso)</p>
+          <div class="flex justify-between items-center text-[10px] text-slate-400 mt-1">
+            <span>Usuario: Juan Pérez</span>
+            <span class="text-[9px] text-slate-500 font-mono">ID: e4c2...1b8</span>
+          </div>
+        </div>
+
+        <div class="audit-item bg-[#151D2C] border border-slate-800 p-2.5 rounded-xl" data-user="ana">
+          <div class="flex items-center justify-between text-[10px] mb-1">
+            <span class="px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 font-bold border border-red-500/30">DELETE</span>
+            <span class="text-slate-500 font-mono">12:55:18 p.m.</span>
+          </div>
+          <p class="text-slate-200 font-semibold text-[11px]">public.tasks (Tarea borrada con confirmación)</p>
+          <div class="flex justify-between items-center text-[10px] text-slate-400 mt-1">
+            <span>Usuario: Ana Martínez</span>
+            <span class="text-[9px] text-slate-500 font-mono">ID: 88aa...7f1</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Barra de Paginación -->
+      <div class="px-4 py-2.5 border-t border-slate-800 bg-[#111726] flex items-center justify-between text-[10px] text-slate-400">
+        <span>Mostrando <strong>1-4</strong> de <strong>42</strong></span>
+        <div class="flex items-center gap-1 font-semibold">
+          <button class="px-2 py-1 rounded bg-slate-800 text-slate-500 cursor-not-allowed">◀ Ant</button>
+          <span class="px-2 py-1 rounded bg-blue-600 text-white">1</span>
+          <button class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300">2</button>
+          <button class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300">Sig ▶</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- PANTALLA 5: PAQUETE DE ICONOS OFICIAL NORA -->
+    <!-- ========================================== -->
+    <div id="screen-iconos" class="screen-view hidden flex-1 flex flex-col bg-[#0B0F19] p-3 overflow-y-auto">
+      <div class="mb-3">
+        <h3 class="text-xs font-bold text-white">🎨 Paquete de Iconos Nora (SVG)</h3>
+        <p class="text-[10px] text-slate-400">Estilo geométrico con acentos azul y destellos IA</p>
+      </div>
+
+      <div class="grid grid-cols-2 gap-2 text-[10px]">
+        <div class="bg-[#151D2C] border border-slate-800 p-2.5 rounded-xl flex items-center gap-2">
+          <span class="text-purple-400 text-base">✨</span>
+          <div>
+            <p class="font-bold text-white">nora-spark</p>
+            <p class="text-[9px] text-slate-400">Asistente IA</p>
+          </div>
+        </div>
+        <div class="bg-[#151D2C] border border-slate-800 p-2.5 rounded-xl flex items-center gap-2">
+          <span class="text-blue-400 text-base">📅</span>
+          <div>
+            <p class="font-bold text-white">calendar-agenda</p>
+            <p class="text-[9px] text-slate-400">Agenda / Mes</p>
+          </div>
+        </div>
+        <div class="bg-[#151D2C] border border-slate-800 p-2.5 rounded-xl flex items-center gap-2">
+          <span class="text-indigo-400 text-base">👥</span>
+          <div>
+            <p class="font-bold text-white">users-group</p>
+            <p class="text-[9px] text-slate-400">Gestión de usuarios</p>
+          </div>
+        </div>
+        <div class="bg-[#151D2C] border border-slate-800 p-2.5 rounded-xl flex items-center gap-2">
+          <span class="text-emerald-400 text-base">🛡️</span>
+          <div>
+            <p class="font-bold text-white">shield-audit</p>
+            <p class="text-[9px] text-slate-400">Auditoría transaccional</p>
+          </div>
+        </div>
+        <div class="bg-[#151D2C] border border-slate-800 p-2.5 rounded-xl flex items-center gap-2">
+          <span class="text-amber-400 text-base">🕒</span>
+          <div>
+            <p class="font-bold text-white">clock-time</p>
+            <p class="text-[9px] text-slate-400">Horarios disponibles</p>
+          </div>
+        </div>
+        <div class="bg-[#151D2C] border border-slate-800 p-2.5 rounded-xl flex items-center gap-2">
+          <span class="text-blue-400 text-base">✅</span>
+          <div>
+            <p class="font-bold text-white">check-task</p>
+            <p class="text-[9px] text-slate-400">Tarea completada</p>
+          </div>
+        </div>
+        <div class="bg-[#151D2C] border border-slate-800 p-2.5 rounded-xl flex items-center gap-2">
+          <span class="text-cyan-400 text-base">ℹ️</span>
+          <div>
+            <p class="font-bold text-white">info-detail</p>
+            <p class="text-[9px] text-slate-400">Trazabilidad detallada</p>
+          </div>
+        </div>
+        <div class="bg-[#151D2C] border border-slate-800 p-2.5 rounded-xl flex items-center gap-2">
+          <span class="text-red-400 text-base">🗑️</span>
+          <div>
+            <p class="font-bold text-white">trash-delete</p>
+            <p class="text-[9px] text-slate-400">Borrado en cascada</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- MODAL 1: FICHA ESTÁNDAR DE TAREA Y TRAZABILIDAD DETALLADA -->
+    <!-- ========================================== -->
+    <div id="modal-task-detail" class="hidden absolute inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div class="bg-[#151D2C] border border-slate-800 rounded-3xl p-5 w-full max-w-sm shadow-2xl space-y-3.5">
+        
+        <!-- Encabezado de la Ficha Estándar -->
+        <div class="flex items-start justify-between">
+          <div>
+            <span id="std-task-priority" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-950 text-amber-300 border border-amber-800/60">
+              ALTA
+            </span>
+            <h3 id="std-task-title" class="font-bold text-sm text-white mt-1.5">Cotización a Ana</h3>
+          </div>
+          <button onclick="closeStandardTaskModal()" class="text-slate-400 hover:text-white p-1 text-sm">✕</button>
+        </div>
+
+        <!-- Campos Estándar de la Tarea -->
+        <div class="space-y-1.5 text-xs bg-slate-900/80 p-3 rounded-xl border border-slate-800">
+          <div class="flex justify-between py-1 border-b border-slate-800/80">
+            <span class="text-slate-400">📅 Fecha Límite:</span>
+            <span id="std-task-due" class="text-slate-200 font-semibold">20-nov-2026</span>
+          </div>
+          <div class="flex justify-between py-1 border-b border-slate-800/80">
+            <span class="text-slate-400">🕒 Hora Asignada:</span>
+            <span id="std-task-time" class="text-purple-300 font-bold">10:00 AM</span>
+          </div>
+          <div class="flex justify-between py-1">
+            <span class="text-slate-400">👤 Asignado a:</span>
+            <span id="std-task-assignee" class="text-blue-400 font-semibold">Ana Martínez</span>
+          </div>
+        </div>
+
+        <!-- SECCIÓN DE INFORMACIÓN DETALLADA (TRAZABILIDAD Y AUDITORÍA) -->
+        <div id="detailed-info-panel" class="hidden space-y-2 text-[10px] bg-slate-950/90 p-3 rounded-xl border border-purple-900/40 text-slate-300">
+          <p class="font-bold text-purple-300 text-[11px] flex items-center gap-1">
+            🔍 Metadatos de Creación y Trazabilidad:
+          </p>
+          <div class="space-y-1">
+            <p><strong>• Creada por:</strong> <span id="meta-creator" class="text-slate-100">Roberto Admin</span></p>
+            <p><strong>• Fecha/Hora de Creación:</strong> <span class="font-mono text-slate-200">19-nov-2026, 01:24:10 p.m.</span></p>
+            <p><strong>• Origen / Canal:</strong> <span id="meta-source" class="text-emerald-400 font-bold">Asistente IA (Chat Lenguaje Natural)</span></p>
+            <p><strong>• Dispositivo:</strong> <span class="text-slate-300">PWA Mobile (Chrome Android) • IP: 190.167.45.12</span></p>
+            <p><strong>• Última Actualización:</strong> <span class="font-mono text-slate-200">19-nov-2026, 01:24:10 p.m.</span></p>
+          </div>
+        </div>
+
+        <!-- Botones de Acción -->
+        <div class="space-y-2 pt-1">
+          <button onclick="toggleDetailedInfo()" id="btn-toggle-details" class="w-full py-2 rounded-xl bg-purple-900/40 hover:bg-purple-900/60 border border-purple-700/50 text-purple-200 font-bold text-xs flex items-center justify-center gap-1.5 transition">
+            <span>ℹ️</span> Ver información detallada
+          </button>
+          <div class="flex gap-2">
+            <button onclick="alert('Tarea marcada como hecha')" class="flex-1 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-sm">
+              ✓ Completar
+            </button>
+            <button onclick="closeStandardTaskModal()" class="py-2 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold">
+              Cerrar
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- MODAL 2: CONFIRMACIÓN DE BORRADO EN CASCADA -->
+    <div id="modal-delete-user" class="hidden absolute inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div class="bg-[#151D2C] border border-red-800/80 rounded-3xl p-5 w-full max-w-sm shadow-2xl space-y-3">
+        <div class="w-10 h-10 rounded-full bg-red-500/20 border border-red-500/40 text-red-400 flex items-center justify-center text-lg mx-auto">
+          ⚠️
+        </div>
+        <div class="text-center">
+          <h4 class="text-sm font-bold text-white">¿Eliminar usuario en cascada?</h4>
+          <p class="text-xs text-slate-300 mt-1 leading-relaxed">
+            Se eliminará a <strong id="delete-user-name" class="text-red-400"></strong> junto con <strong>todas sus tareas asignadas</strong> y registros dependientes.
+          </p>
+          <p class="text-[11px] text-red-400/90 font-medium mt-1">Esta acción es irreversible.</p>
+        </div>
+        <div class="flex gap-2 pt-2">
+          <button onclick="closeDeleteUserModal()" class="flex-1 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs">
+            Cancelar
+          </button>
+          <button onclick="confirmDeleteUser()" class="flex-1 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-xs shadow-lg shadow-red-600/40">
+            Sí, eliminar todo
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Navegación Inferior Móvil (Bottom Navigation) -->
+    <footer class="h-14 border-t border-slate-800 bg-[#0B0F19] px-6 flex items-center justify-around text-slate-400 text-[10px] font-medium z-10">
+      <button onclick="switchScreen('agenda')" class="flex flex-col items-center gap-0.5 text-blue-400">
+        <span class="text-base">📅</span> Agenda
+      </button>
+      <button onclick="switchScreen('chat')" class="flex flex-col items-center gap-0.5 text-purple-400 font-semibold hover:text-white">
+        <span class="text-base">✨</span> Asistente
+      </button>
+      <button onclick="switchScreen('usuarios')" id="nav-btn-users" class="flex flex-col items-center gap-0.5 hover:text-white">
+        <span class="text-base">👥</span> Equipo
+      </button>
+      <button onclick="switchScreen('auditoria')" id="nav-btn-audit" class="flex flex-col items-center gap-0.5 hover:text-white">
+        <span class="text-base">🛡️</span> Auditoría
+      </button>
+    </footer>
+
+  </main>
+
+  <!-- LÓGICA DE INTERACCIÓN -->
+  <script>
+    let isDarkMode = true;
+    let currentRole = 'Supervisor';
+    let isDetailsVisible = false;
+
+    function switchScreen(screenName) {
+      document.querySelectorAll('.screen-view').forEach(el => el.classList.add('hidden'));
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('bg-blue-600', 'text-white', 'font-semibold');
+        btn.classList.add('text-slate-400');
+      });
+
+      const activeScreen = document.getElementById(`screen-${screenName}`);
+      const activeTab = document.getElementById(`tab-${screenName}`);
+      if (activeScreen) activeScreen.classList.remove('hidden');
+      if (activeTab) {
+        activeTab.classList.add('bg-blue-600', 'text-white', 'font-semibold');
+        activeTab.classList.remove('text-slate-400');
+      }
+    }
+
+    function selectTimeSlot(slotTime) {
+      document.querySelectorAll('.time-slot-btn').forEach(btn => {
+        btn.classList.remove('bg-purple-600', 'text-white');
+        btn.classList.add('bg-slate-800', 'text-slate-300');
+      });
+      event.target.classList.remove('bg-slate-800', 'text-slate-300');
+      event.target.classList.add('bg-purple-600', 'text-white');
+
+      const feedback = document.getElementById('selected-slot-feedback');
+      feedback.innerText = `✓ Hora seleccionada y confirmada en agenda: ${slotTime}`;
+      feedback.classList.remove('hidden');
+    }
+
+    function openStandardTaskModal(title, priority, due, time, assignee, creator, source) {
+      document.getElementById('std-task-title').innerText = title;
+      document.getElementById('std-task-due').innerText = due;
+      document.getElementById('std-task-time').innerText = time;
+      document.getElementById('std-task-assignee').innerText = assignee;
+      document.getElementById('meta-creator').innerText = creator;
+      document.getElementById('meta-source').innerText = source;
+
+      isDetailsVisible = false;
+      document.getElementById('detailed-info-panel').classList.add('hidden');
+      document.getElementById('btn-toggle-details').innerHTML = '<span>ℹ️</span> Ver información detallada';
+
+      document.getElementById('modal-task-detail').classList.remove('hidden');
+    }
+
+    function closeStandardTaskModal() {
+      document.getElementById('modal-task-detail').classList.add('hidden');
+    }
+
+    function toggleDetailedInfo() {
+      const panel = document.getElementById('detailed-info-panel');
+      const btn = document.getElementById('btn-toggle-details');
+      isDetailsVisible = !isDetailsVisible;
+
+      if (isDetailsVisible) {
+        panel.classList.remove('hidden');
+        btn.innerHTML = '<span>▲</span> Ocultar información detallada';
+      } else {
+        panel.classList.add('hidden');
+        btn.innerHTML = '<span>ℹ️</span> Ver información detallada';
+      }
+    }
+
+    function filterAuditLogs() {
+      const filter = document.getElementById('audit-filter-user').value;
+      const items = document.querySelectorAll('.audit-item');
+
+      items.forEach(item => {
+        if (filter === 'all' || item.getAttribute('data-user') === filter) {
+          item.classList.remove('hidden');
+        } else {
+          item.classList.add('hidden');
+        }
+      });
+    }
+
+    function toggleTheme() {
+      const viewport = document.getElementById('app-viewport');
+      const icon = document.getElementById('theme-icon');
+      const text = document.getElementById('theme-text');
+      isDarkMode = !isDarkMode;
+
+      if (isDarkMode) {
+        viewport.classList.remove('bg-slate-50', 'text-slate-900');
+        viewport.classList.add('bg-[#0B0F19]', 'text-slate-100');
+        icon.innerText = '🌙';
+        text.innerText = 'Modo Oscuro';
+      } else {
+        viewport.classList.remove('bg-[#0B0F19]', 'text-slate-100');
+        viewport.classList.add('bg-slate-50', 'text-slate-900');
+        icon.innerText = '☀️';
+        text.innerText = 'Modo Claro';
+      }
+    }
+
+    function toggleRole() {
+      const label = document.getElementById('role-label');
+      const adminFilter = document.getElementById('admin-user-filter');
+      const tabUsers = document.getElementById('tab-usuarios');
+      const tabAudit = document.getElementById('tab-auditoria');
+      const navBtnUsers = document.getElementById('nav-btn-users');
+      const navBtnAudit = document.getElementById('nav-btn-audit');
+
+      if (currentRole === 'Supervisor') {
+        currentRole = 'Miembro';
+        label.innerText = 'Miembro';
+        adminFilter.classList.add('opacity-0', 'pointer-events-none');
+        tabUsers.classList.add('hidden');
+        tabAudit.classList.add('hidden');
+        navBtnUsers.classList.add('hidden');
+        navBtnAudit.classList.add('hidden');
+        if (!document.getElementById('screen-usuarios').classList.contains('hidden') || 
+            !document.getElementById('screen-auditoria').classList.contains('hidden')) {
+          switchScreen('agenda');
+        }
+      } else {
+        currentRole = 'Supervisor';
+        label.innerText = 'Supervisor (Admin)';
+        adminFilter.classList.remove('opacity-0', 'pointer-events-none');
+        tabUsers.classList.remove('hidden');
+        tabAudit.classList.remove('hidden');
+        navBtnUsers.classList.remove('hidden');
+        navBtnAudit.classList.remove('hidden');
+      }
+    }
+
+    function openDeleteUserModal(userName) {
+      document.getElementById('delete-user-name').innerText = userName;
+      document.getElementById('modal-delete-user').classList.remove('hidden');
+    }
+
+    function closeDeleteUserModal() {
+      document.getElementById('modal-delete-user').classList.add('hidden');
+    }
+
+    function confirmDeleteUser() {
+      alert('Usuario eliminado correctamente. Sus tareas y registros fueron purgados en cascada.');
+      closeDeleteUserModal();
+    }
+  </script>
+</body>
+</html>
