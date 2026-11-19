@@ -44,17 +44,15 @@
             }
           </nav>
 
-          <!-- Role Switcher -->
-          <button
-            (click)="auth.toggleRole()"
-            class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all border"
-            [class]="auth.isSupervisor() ? 'bg-purple-950/60 border-purple-800 text-purple-200' : 'bg-slate-900 border-slate-800 text-slate-300'"
-            title="Alternar entre rol Miembro y Supervisor para pruebas"
+          <!-- Rol Real del Usuario Autenticado (Desde JWT / BD) -->
+          <div
+            class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border"
+            [class]="auth.isSupervisor() ? 'bg-purple-950/60 border-purple-800/80 text-purple-200' : 'bg-slate-900 border-slate-800 text-slate-300'"
+            [title]="'Rol activo: ' + (auth.currentUser()?.roleLabel || (auth.isSupervisor() ? 'Supervisor' : 'Miembro'))"
           >
             <app-icon [name]="auth.isSupervisor() ? 'shield-audit' : 'users-group'" customClass="w-3.5 h-3.5"></app-icon>
-            <span class="hidden sm:inline">{{ auth.isSupervisor() ? 'Supervisor' : 'Miembro' }}</span>
-            <span class="text-[10px] opacity-60">⇄</span>
-          </button>
+            <span class="hidden sm:inline">{{ auth.currentUser()?.roleLabel || (auth.isSupervisor() ? 'Supervisor' : 'Miembro') }}</span>
+          </div>
 
           <!-- Avatar & Logout -->
           <div class="flex items-center gap-1.5 pl-1 border-l border-slate-800">
@@ -70,7 +68,7 @@
               class="p-2 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-lg transition"
               title="Cerrar sesión"
             >
-              <app-icon name="trash-delete" customClass="w-3.5 h-3.5"></app-icon>
+              <app-icon name="log-out" customClass="w-4 h-4"></app-icon>
             </button>
           </div>
         </div>

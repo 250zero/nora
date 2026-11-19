@@ -50,16 +50,6 @@ export class AuthService {
     );
   }
 
-  register(data: { email: string; password: string; displayName: string }): Observable<any> {
-    return this.api.post('auth/register', data).pipe(
-      tap((res: any) => {
-        if (res.session?.access_token && res.user) {
-          this.setSession(res.session.access_token, res.user);
-        }
-      })
-    );
-  }
-
   logout(): void {
     if (typeof localStorage !== 'undefined') {
       localStorage.removeItem(AUTH_TOKEN_KEY);
@@ -68,22 +58,6 @@ export class AuthService {
     this.token.set(null);
     this.currentUser.set(null);
     this.router.navigate(['/login']);
-  }
-
-  // Alternar rol localmente si es necesario para testing
-  toggleRole(): void {
-    const current = this.currentUser();
-    if (!current) return;
-    const nextRole = current.role === 1 ? 2 : 1;
-    const updated: UserProfile = {
-      ...current,
-      role: nextRole,
-      roleLabel: nextRole === 2 ? 'Supervisor' : 'Miembro',
-    };
-    this.currentUser.set(updated);
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(AUTH_USER_KEY, JSON.stringify(updated));
-    }
   }
 
   private setSession(token: string, user: UserProfile): void {

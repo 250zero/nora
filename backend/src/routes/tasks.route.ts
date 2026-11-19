@@ -20,8 +20,11 @@ const taskSchema = z.object({
 // GET /api/tasks — Listado de tareas con filtros
 tasksRouter.get("/", async (c: Context) => {
   const statusParam = c.req.query("status");
-  const userId = c.req.query("user_id");
+  const queryUserId = c.req.query("user_id");
   const search = c.req.query("search");
+
+  const headerUserId = c.req.header("X-User-Id");
+  const headerRole = Number(c.req.header("X-Active-Role")) || 1;
 
   let query = supabase
     .from("tasks")
@@ -49,8 +52,12 @@ tasksRouter.get("/", async (c: Context) => {
     if (!isNaN(statusNum)) query = query.eq("status", statusNum);
   }
 
-  if (userId) {
-    query = query.or(`owner_id.eq.${userId},assignee_id.eq.${userId}`);
+  // Si es Miembro (rol 1), SIEMPRE se aísla por su user_id
+  if (headerRole === 1 && headerUserId) {
+    query = query.or(`owner_id.eq.${headerUserId},assignee_id.eq.${headerUserId}`);
+  } else if (queryUserId) {
+    // Si es Supervisor (rol 2) y filtra por un usuario específico
+    query = query.or(`owner_id.eq.${queryUserId},assignee_id.eq.${queryUserId}`);
   }
 
   if (search) {

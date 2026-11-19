@@ -96,7 +96,7 @@ def main():
     # 6. Comprobación de Salud en Vivo
     print("\n[6/6] Comprobando salud de los servicios...")
     run_cmd(client, "sleep 2 && systemctl is-active nora-backend")
-    run_cmd(client, "curl -s http://127.0.0.1:3000/api/health")
+    run_cmd(client, "curl -s http://127.0.0.1:3001/api/health")
     run_cmd(client, "curl -sI https://nora.vis7ar.com | head -n 5")
     run_cmd(client, "curl -s https://api.nora.vis7ar.com/api/health")
 

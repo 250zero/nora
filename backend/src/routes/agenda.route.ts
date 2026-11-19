@@ -7,11 +7,10 @@ export const agendaRouter = new Hono();
 agendaRouter.get("/", async (c: Context) => {
   const year = c.req.query("year") || new Date().getFullYear().toString();
   const month = c.req.query("month") || (new Date().getMonth() + 1).toString().padStart(2, "0");
-  const userId = c.req.query("user_id");
+  const queryUserId = c.req.query("user_id");
 
-  // Rango de fechas aproximado para el mes
-  const startDate = `${year}-${month.padStart(2, "0")}-01`;
-  const endDate = `${year}-${month.padStart(2, "0")}-31`;
+  const headerUserId = c.req.header("X-User-Id");
+  const headerRole = Number(c.req.header("X-Active-Role")) || 1;
 
   let query = supabase
     .from("tasks")
@@ -32,8 +31,12 @@ agendaRouter.get("/", async (c: Context) => {
     .order("due_date", { ascending: true })
     .order("due_time", { ascending: true });
 
-  if (userId) {
-    query = query.or(`owner_id.eq.${userId},assignee_id.eq.${userId}`);
+  // Si es Miembro (rol 1), SIEMPRE se aísla por su user_id
+  if (headerRole === 1 && headerUserId) {
+    query = query.or(`owner_id.eq.${headerUserId},assignee_id.eq.${headerUserId}`);
+  } else if (queryUserId) {
+    // Si es Supervisor (rol 2) y filtra por un usuario específico
+    query = query.or(`owner_id.eq.${queryUserId},assignee_id.eq.${queryUserId}`);
   }
 
   const { data: tasks, error } = await query;
