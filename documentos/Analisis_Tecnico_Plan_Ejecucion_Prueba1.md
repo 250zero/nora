@@ -7,32 +7,39 @@
 ## 1. Resumen Ejecutivo y Restricciones Críticas
 
 ### 1.1 Objetivo (≤3 líneas)
-PWA móvil donde un usuario escribe pendientes en lenguaje natural ("cobrarle a Juan el viernes y la cotización a Ana mañana, urgente") y un **agente de IA con tool calling** crea, consulta y modifica tareas en **Supabase**. Los datos quedan aislados por usuario con RLS y la app se publica en una URL pública instalable.
+PWA móvil donde un usuario escribe pendientes en lenguaje natural ("cobrarle a Juan el viernes y la cotización a Ana mañana, urgente") y un **agente de IA con tool calling** crea, consulta y modifica tareas en **Supabase Cloud**. Los datos quedan aislados por usuario con RLS y la app se publica en producción en el servidor de pruebas Visar (`https://nora.vis7ar.com`) con Nginx nativo sin Docker.
 
 ### 1.2 Restricciones
 
 | Tipo | Restricción | Fuente |
 |---|---|---|
 | Tiempo | 8 h máximo; 30 min iniciales de plan; cambio sorpresa a las 3:30 h | Reglas |
-| Stack obligatorio | **Supabase (Postgres + Auth)**; frontend libre | Reglas |
+| Stack obligatorio | **Supabase Cloud (Postgres 5FN + Auth + Edge Functions con Hono)**; frontend Angular 19 PWA | Reglas, Definición |
 | Seguridad | La llave de IA **nunca** en el navegador → Edge Function/backend (RF-28) | Reglas, RF-28 |
 | Seguridad | RLS: A no ve ni modifica tareas de B, **ni llamando la API directamente** (RF-03) | RF-03 |
+| Auditoría | Desacoplada en la capa de aplicación con **middleware en Hono** (`auditMiddleware`) con `EdgeRuntime.waitUntil()`; **cero triggers SQL** de auditoría para evitar contención y permitir auditar `SELECT` con IP/User-Agent | Decisión Arq |
 | Arquitectura IA | El modelo **no escribe** en la BD; el backend ejecuta y valida cada herramienta (RF-14) | RF-14 |
 | IA | Proveedor: Claude, OpenAI o Gemini | Reglas |
-| Despliegue | URL pública (Vercel/Netlify o similar), probada en un celular real | RF-27 |
+| Despliegue | Servidor Visar Ubuntu (`159.203.103.8`, `vis7ar.com`) con Nginx puro (0 Docker) en `https://nora.vis7ar.com`, con SSL Certbot, probada en celular real | RF-27, DevOps |
 | Código | Git con commits frecuentes; esquema SQL versionado que recrea las tablas desde cero (RF-29) | Reglas, RF-29 |
 | Zona horaria | Por defecto `America/Santo_Domingo` (UTC-4, sin horario de verano) | RF-19 |
 | Alcance | "Menos y funcionando" > "mucho a medias"; lo no hecho va al README | Reglas |
 
 ### 1.3 Decisión de stack y arquitectura visual (ADR-01)
-- **Frontend:** Angular 19 (Standalone + Signals + OnPush + Tailwind CSS) con tema oscuro nativo estilo *Google Calendar Mobile*.
+- **Frontend:** Angular 19 (Standalone + Signals + OnPush + Tailwind CSS) configurado como PWA instalable con tema oscuro nativo estilo *Google Calendar Mobile*.
   - **Patrón Visual de Agenda:** Selector superior de vistas (**Día**, **Semana**, **Mes**), barra superior con buscador, selector rápido de fecha, avatar del usuario y **filtro por usuario** (exclusivo para rol Supervisor/Admin).
   - **Orquestación Centrada en el Asistente IA:** Se **elimina el botón manual de agregar (+)** en la pantalla de Agenda. La creación y agendamiento de tareas se canaliza de forma natural a través del **Asistente IA Nora** (accesible desde el header y la barra inferior), el cual analiza la disponibilidad del usuario y propone **múltiples opciones de horarios libres** para seleccionar con un toque.
   - **Ficha Estándar y Trazabilidad Detallada:** Formato unificado de visualización de tareas con botón **"Ver información detallada"** para inspeccionar: quién la creó, fecha/hora exacta de creación, origen/canal (Asistente IA vs Manual), dispositivo/IP y última actualización.
   - **Módulo de Gestión de Usuarios:** CRUD completo para el Supervisor con drill-down a las tareas del colaborador (ver, editar y eliminar con confirmación modal). Cascada estricta: si se elimina un usuario, se eliminan todas sus tareas y mensajes asociados.
   - **Paquete Oficial de Iconos Nora:** Catálogo tipado de iconos SVG (`nora-spark`, `calendar-agenda`, `users-group`, `shield-audit`, `clock-time`, `check-task`, `info-detail`, `trash-delete`, `filter`, `mic-voice`) diseñados con el ADN del logo (trazos limpios, geometría moderna, acentos azul/violeta y destello IA).
-- **Backend:** **Supabase Edge Functions (Deno/TypeScript)** para el agente y APIs seguras.
-- **Auditoría Transaccional Paginada (Solo Admin):** Tabla centralizada `audit_logs` en PostgreSQL accesible exclusivamente por el rol Supervisor, con **filtro por usuario**, **paginación** y registro de `INSERT`, `UPDATE`, `DELETE` (triggers) y `SELECT` (servicios).
+- **Backend e Infraestructura Cloud:**
+  - **Supabase Cloud (PaaS Gestionado):** Aloja la base de datos PostgreSQL en 5FN, Supabase Auth con JWT e infraestructura serverless de **Edge Functions (Deno / TypeScript + Hono Framework)**.
+  - **Despliegue Frontend Minimalista (Servidor Visar - 0 Docker):** Despliegue en el droplet de DigitalOcean de Visar (`159.203.103.8`, `vis7ar.com`) dedicado a portafolio y pruebas. Los archivos estáticos (`dist/`) se sirven directamente mediante **Nginx nativo** bajo el subdominio `https://nora.vis7ar.com` con HTTPS automático vía Let's Encrypt / Certbot. Cero consumo de RAM en el VPS para bases de datos o contenedores.
+- **Auditoría Desacoplada por Middleware (Sin Triggers SQL):**
+  - Se sustituyen los triggers `tg_audit_log` de PostgreSQL por un **middleware en la capa de aplicación (`auditMiddleware` en Hono)**.
+  - Permite auditar tanto mutaciones (`INSERT`, `UPDATE`, `DELETE`) como lecturas sensibles (`SELECT`), enriquecidas con metadatos HTTP reales (`ip_address`, `user_agent`, `duration_ms`).
+  - Escritura asíncrona no bloqueante mediante `EdgeRuntime.waitUntil()` para no penalizar la latencia del usuario final.
+  - Interfaz de consulta de auditoría en la app **exclusiva para Supervisor/Admin**, con **filtro por usuario** y **paginación server-side**.
 - **Auth/JWT:** `supabase-js` con persistencia de sesión y paso del token JWT con UUID del usuario en cada petición para resolver roles, menús y RLS.
 - **Enums:** `smallint` enteros fijos con constraints `CHECK`. Conversión a contratos legibles en DTOs.
 
@@ -71,15 +78,15 @@ PWA móvil donde un usuario escribe pendientes en lenguaje natural ("cobrarle a 
 | RF-23 | PWA | Manifest (nombre, íconos 192/512, theme_color), standalone | Bajo | RF-27 (HTTPS) |
 | RF-24 | PWA | Service worker: offline muestra las últimas tareas + aviso "sin conexión" | Medio | RF-06, RF-23 |
 | RF-25 | UI | Estados de carga, vacío y error en todas las pantallas | Bajo | Todas las vistas |
-| RF-27 | DevOps | URL pública funcional desde un celular | Medio | — |
+| RF-27 | DevOps | URL pública funcional desde un celular real desplegada en Servidor Visar (`https://nora.vis7ar.com`) con Nginx puro (0 Docker) y Supabase Cloud | Medio | — |
 | RF-28 | Seguridad | Llaves de IA fuera del navegador | Medio | Edge Function |
-| RF-29 | DevOps/BD | Esquema versionado (migraciones Supabase CLI) | Bajo | — |
+| RF-29 | DevOps/BD | Esquema versionado (migraciones Supabase CLI sobre Supabase Cloud) | Bajo | — |
 | CS-01 | Sorpresa | Rol supervisor: ve todo, asigna a otros, filtra por persona (ver §5.4) | **Alto** | RF-03, RF-05 |
 | RF-UI-CAL | UI / Agenda | Vistas de Calendario Día, Semana y Mes con grid y pills; **sin botón ADD** en agenda (creación orquestada por IA) | Medio | RF-06, RF-22 |
 | RF-AI-MULTI | Agente | Sugerencia de **múltiples bloques horarios libres** en agenda para confirmar hora con un solo toque | Medio | RF-12, RF-19 |
 | RF-TASK-STD | Tareas | Ficha estándar de tareas con botón **"Ver información detallada"** (creador, hora/fecha, origen IA/manual y última actualización) | Bajo | RF-05, RF-07 |
 | RF-USR-CRUD | Admin | Módulo CRUD de Gestión de Usuarios para Supervisor (con vista de tareas por usuario, edición y borrado en cascada con confirmación modal) | Medio | RF-03, CS-01 |
-| RF-AUDIT | Seguridad/BD | Tabla e histórico transaccional `audit_logs` **solo para Admin**, con **filtro por usuario**, **paginación** y registro de DML + SELECT | Medio | RF-03, RF-29 |
+| RF-AUDIT | Seguridad/BD | Tabla e histórico `audit_logs` **solo para Admin**, con **filtro por usuario**, **paginación** y registro de mutaciones y lecturas vía **Middleware en Hono (0 triggers)** | Medio | RF-03, RF-29 |
 | RF-ICONS | UI | Paquete de 10 iconos oficiales Nora SVG tipados en `ICON_CATALOG` (`IconRegistryService`) | Bajo | RF-22 |
 
 ### 2.2 Bloque B — Alcance Secundario (Deseables / Post-MVP), en orden de valor/costo
@@ -127,40 +134,47 @@ PWA móvil donde un usuario escribe pendientes en lenguaje natural ("cobrarle a 
 
 ```mermaid
 flowchart LR
-  subgraph Cliente["PWA Angular (Vercel)"]
-    UI["features: auth, tasks, assistant, team"]
+  subgraph Cliente["PWA Angular 19 (Servidor Visar — Nginx nativo nora.vis7ar.com)"]
+    UI["features: auth, agenda, assistant, users-admin, audit"]
     Store["Signal Stores + snapshot IndexedDB"]
     SW["Angular Service Worker (ngsw)"]
   end
-  subgraph Supabase
+  subgraph SupabaseCloud["Supabase Cloud"]
     Auth["Supabase Auth (JWT)"]
     REST["PostgREST + RLS"]
-    EF1["Edge Function agent-chat"]
-    EF2["Edge Function agent-confirm"]
-    DB[("Postgres: profiles, user_roles, tasks, chat_messages, agent_pending_actions")]
+    subgraph EdgeFunctions["Edge Functions (Deno + Hono Framework)"]
+      EF1["agent-chat (Loop IA + Tool Calling)"]
+      EF2["agent-confirm (Acciones Destructivas)"]
+      AuditMW["auditMiddleware (Intercepta peticiones, no bloqueante)"]
+    end
+    DB[("PostgreSQL 5FN: profiles, user_roles, tasks, chat_messages, agent_pending_actions, audit_logs")]
   end
-  LLM["API IA (Gemini/Claude)"]
+  LLM["API IA (Gemini / Claude / OpenAI)"]
+
   UI --> Store
-  Store -->|"CRUD manual con JWT"| REST
+  Store -->|"CRUD con JWT + Headers"| AuditMW
+  AuditMW --> REST
+  AuditMW -.->|"EdgeRuntime.waitUntil (Async 0-lag)"| DB
   UI -->|"functions.invoke con JWT"| EF1
   UI -->|"confirmar acción"| EF2
-  EF1 -->|"cliente supabase con JWT del usuario (RLS)"| REST
+  EF1 -->|"cliente supabase con JWT (RLS)"| REST
   EF2 --> REST
   EF1 -->|"API key en secrets"| LLM
   REST --> DB
   Auth --> DB
 ```
 
-| Capa | Responsabilidad | Notas de seguridad |
+| Capa | Responsabilidad | Notas de seguridad / Rendimiento |
 |---|---|---|
-| Frontend Angular | UI, validación UX (Reactive Forms), stores, cálculo de vistas, offline snapshot | Solo `anon key` (pública). Nunca la llave de IA |
+| Frontend Angular 19 | UI, validación UX (Reactive Forms), stores, cálculo de vistas, offline snapshot | Solo `anon key` (pública). Desplegado en Visar (`nora.vis7ar.com`) con Nginx nativo. |
 | `core/` | `SupabaseClientService`, `AuthService` (signals), `authGuard`/`guestGuard`/`roleGuard`, `DateService` (TZ), `NetworkStatusService`, `AuditService` | |
 | `shared/` | `<app-icon>`, `ui-empty-state`, `ui-error-state`, `ui-skeleton`, `confirm-dialog` (confirmación destructiva modal), `field-error` | |
-| `layout/` | `AppShell` (header con selector mes/año, buscador, avatar, toggle de vistas Día/Semana/Mes, filtro por usuario para Admin, Bottom-Nav / Menú: Agenda / Gestión de Usuarios*), `FabSpeedDial`, `OfflineBanner` | *Gestión de Usuarios solo visible para Admin/Supervisor |
-| `features/` | `auth`, `agenda` (calendario Día/Semana/Mes, grid con pills de tareas, filtros), `users-admin` (CRUD usuarios + vista de tareas por usuario + borrado en cascada), `assistant` (chat IA con tool calling) | Sin imports entre features |
-| Edge `agent-chat` | Loop del agente, definición de herramientas, validación (zod), ejecución vía cliente con JWT del usuario | Secret `LLM_API_KEY`; **sin service_role** para las herramientas |
-| Edge `agent-confirm` | Ejecuta o cancela acciones pendientes (eliminar) | Valida dueño, estado y expiración |
-| Postgres | Integridad (constraints), RLS, triggers (`updated_at`, `completed_at`, perfil, guardas, `tg_audit_log`), borrado en cascada `ON DELETE CASCADE` | La defensa final es RLS y auditoría |
+| `layout/` | `AppShell` (header con selector mes/año, buscador, avatar, toggle de vistas Día/Semana/Mes, filtro por usuario para Admin, Bottom-Nav / Menú: Agenda / Gestión de Usuarios*), `OfflineBanner` | *Gestión de Usuarios solo visible para Admin/Supervisor |
+| `features/` | `auth`, `agenda` (calendario Día/Semana/Mes, grid con pills de tareas, filtros), `users-admin` (CRUD usuarios + vista de tareas por usuario + borrado en cascada), `assistant` (chat IA con tool calling), `audit` (visitas y mutaciones solo Admin) | Sin imports entre features |
+| Edge `auditMiddleware` (Hono) | Intercepta peticiones entrantes, extrae JWT, IP real y User-Agent; persiste en `audit_logs` con `EdgeRuntime.waitUntil()` | **Cero triggers en BD**. Permite auditar mutaciones y lecturas `SELECT` sin bloquear la respuesta. |
+| Edge `agent-chat` (Hono) | Loop del agente, definición de herramientas, validación (zod), ejecución vía cliente con JWT del usuario | Secret `LLM_API_KEY`; **sin service_role** para las herramientas |
+| Edge `agent-confirm` (Hono) | Ejecuta o cancela acciones pendientes (eliminar) | Valida dueño, estado y expiración |
+| Postgres (Supabase Cloud) | Integridad relacional (5FN, constraints), RLS estricto, triggers de negocio (`updated_at`, `completed_at`, perfil, guardas), borrado en cascada `ON DELETE CASCADE` | Sin triggers de auditoría (se delegan al middleware de Hono) |
 
 ### 4.1.1 Especificación Visual y de Interacción (Basada en Mockup)
 
@@ -480,7 +494,7 @@ create table public.chat_messages (
 );
 create index ix_chat_user_created on public.chat_messages (user_id, created_at desc);
 
--- AUDIT LOGS (Histórico transaccional: INSERT, UPDATE, DELETE vía Trigger; SELECT vía Edge/Service)
+-- AUDIT LOGS (Histórico transaccional desacoplado: poblado vía auditMiddleware en Edge Functions; CERO triggers en BD)
 create table public.audit_logs (
   id          uuid primary key default gen_random_uuid(),
   user_id     uuid references public.profiles(id) on delete cascade,
@@ -490,9 +504,11 @@ create table public.audit_logs (
   old_data    jsonb,
   new_data    jsonb,
   ip_address  text,
+  user_agent  text,
   created_at  timestamptz not null default now()
 );
 create index ix_audit_logs_user_table on public.audit_logs (user_id, table_name, created_at desc);
+create index ix_audit_logs_created on public.audit_logs (created_at desc);
 
 -- PENDING ACTIONS (confirmación de destructivas)
 create table public.agent_pending_actions (
@@ -506,43 +522,7 @@ create table public.agent_pending_actions (
 );
 create index ix_pending_user_status on public.agent_pending_actions (user_id, status);
 
--- TRIGGERS DE NEGOCIO Y AUDITORÍA
-create or replace function public.tg_audit_log() returns trigger
-language plpgsql security definer set search_path = '' as $$
-declare
-  v_action smallint;
-  v_record_id uuid;
-  v_old jsonb := null;
-  v_new jsonb := null;
-begin
-  if tg_op = 'INSERT' then
-    v_action := 1;
-    v_record_id := new.id;
-    v_new := to_jsonb(new);
-  elsif tg_op = 'UPDATE' then
-    v_action := 2;
-    v_record_id := new.id;
-    v_old := to_jsonb(old);
-    v_new := to_jsonb(new);
-  elsif tg_op = 'DELETE' then
-    v_action := 3;
-    v_record_id := old.id;
-    v_old := to_jsonb(old);
-  end if;
-
-  insert into public.audit_logs (user_id, table_name, record_id, action, old_data, new_data)
-  values (auth.uid(), tg_table_name, v_record_id, v_action, v_old, v_new);
-
-  return coalesce(new, old);
-end $$;
-
-create trigger trg_audit_tasks after insert or update or delete on public.tasks
-for each row execute function public.tg_audit_log();
-
-create trigger trg_audit_profiles after insert or update or delete on public.profiles
-for each row execute function public.tg_audit_log();
-
--- TRIGGERS
+-- TRIGGERS DE NEGOCIO (Exclusivamente lógica de estado; la auditoría se gestiona en la capa de aplicación)
 create or replace function public.tg_tasks_touch() returns trigger
 language plpgsql as $$
 begin
@@ -650,18 +630,89 @@ create policy profiles_insert_supervisor on public.profiles for insert to authen
 create policy profiles_update_supervisor on public.profiles for update to authenticated using (public.is_supervisor()) with check (public.is_supervisor());
 create policy profiles_delete_supervisor on public.profiles for delete to authenticated using (public.is_supervisor());
 
--- RLS DE AUDITORÍA (Solo lectura para Supervisor; inserción mediante trigger security definer o service)
+-- RLS DE AUDITORÍA (Solo lectura para Supervisor; inserción desacoplada vía Edge Function/Service)
 alter table public.audit_logs enable row level security;
 create policy audit_select_supervisor on public.audit_logs for select to authenticated using (public.is_supervisor());
+create policy audit_insert_authenticated on public.audit_logs for insert to authenticated with check (user_id = auth.uid() or public.is_supervisor());
 revoke all on public.audit_logs from anon;
 
--- AUDITORÍA DE LECTURAS (SELECT):
--- En PostgreSQL los triggers nativos no se disparan en sentencias SELECT.
--- Para auditar lecturas clave (ej. cuando el Admin inspecciona o lista tareas de otros colaboradores),
--- la Edge Function o servicio de datos registra una entrada directa en audit_logs con action = 4 (SELECT).
+-- AUDITORÍA DESACOPLADA EN CAPA DE APLICACIÓN:
+-- Los triggers nativos en PostgreSQL introducen contención de bloqueos y son ciegos a peticiones SELECT y metadatos HTTP.
+-- La auditoría transaccional de Nora se gestiona íntegramente a través de `auditMiddleware` en Supabase Edge Functions (Hono).
 ```
 
-### 4.6 Contratos de la Edge Function
+### 4.6 Contratos de las Edge Functions (Hono Framework)
+
+El backend serverless en **Supabase Cloud** se estructura con el framework **Hono** sobre Deno, ofreciendo enrutamiento ultraligero (<15 KB), tipado estricto y soporte nativo de middleware.
+
+#### 4.6.1 Middleware de Auditoría Desacoplado (`audit.middleware.ts`)
+
+Intercepta mutaciones (`POST`, `PUT`, `PATCH`, `DELETE`) y lecturas sensibles (`GET /tasks`, `GET /users`, etc.), capturando IP real y User-Agent sin bloquear la respuesta HTTP mediante `EdgeRuntime.waitUntil()`:
+
+```ts
+import { MiddlewareHandler } from 'https://deno.land/x/hono@v4.3.11/mod.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
+
+export const auditMiddleware = (): MiddlewareHandler => {
+  return async (c, next) => {
+    const startTime = Date.now();
+    const method = c.req.method;
+    const path = c.req.path;
+    
+    // Captura metadatos de red y cliente
+    const ipAddress = c.req.header('x-forwarded-for')?.split(',')[0].trim() 
+      || c.req.header('cf-connecting-ip') 
+      || '127.0.0.1';
+    const userAgent = c.req.header('user-agent') || 'Unknown';
+
+    // Clonar body para auditoría en mutaciones
+    let reqBody: any = null;
+    if (['POST', 'PUT', 'PATCH'].includes(method)) {
+      try { reqBody = await c.req.json(); } catch { /* ignore */ }
+    }
+
+    // Ejecuta el handler principal primero
+    await next();
+
+    // Mapeo semántico de acción según método HTTP (1=INSERT, 2=UPDATE, 3=DELETE, 4=SELECT)
+    const actionMap: Record<string, number> = {
+      POST: 1,
+      PUT: 2,
+      PATCH: 2,
+      DELETE: 3,
+      GET: 4,
+    };
+    const action = actionMap[method] || 4;
+
+    // Solo auditar si la respuesta fue exitosa o relevante
+    if (c.res.status >= 200 && c.res.status < 400) {
+      const user = c.get('user'); // Extraído por authMiddleware
+      if (user?.id) {
+        // Ejecución en background no bloqueante (0 ms de latencia agregada)
+        // @ts-ignore: EdgeRuntime disponible en Supabase Edge
+        EdgeRuntime.waitUntil((async () => {
+          const supabaseAdmin = createClient(
+            Deno.env.get('SUPABASE_URL')!,
+            Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+          );
+
+          await supabaseAdmin.from('audit_logs').insert({
+            user_id: user.id,
+            table_name: path.split('/')[2] || 'unknown',
+            action: action,
+            old_data: null, // poblado en updates específicos
+            new_data: reqBody ? { payload: reqBody, status: c.res.status } : null,
+            ip_address: ipAddress,
+            user_agent: userAgent,
+          });
+        })());
+      }
+    }
+  };
+};
+```
+
+#### 4.6.2 Endpoints del Sistema
 
 **`POST /functions/v1/agent-chat`** (Header `Authorization: Bearer <jwt>`)
 ```ts
@@ -784,15 +835,62 @@ flowchart LR
 
 | Fase | Ventana | % | Entregables | RF | Commit(s) clave |
 |---|---|---|---|---|---|
-| F0 Plan | 0:00–0:30 | 6 % | Plan de 1 página, preguntas Q1–Q17 enviadas, repo + proyecto Supabase | — | `chore: init repo y plan` |
-| F1 Base | 0:30–1:30 | 12.5 % | Angular + Tailwind + supabase-js; login/registro/logout; guards; `0001_init.sql`; **deploy esqueleto en Vercel** (de-risk RF-27); prueba RLS con 2 usuarios vía `curl` | 01, 02, 03, 29, 27 | `feat(auth)`, `feat(db): init + RLS` |
+| F0 Plan | 0:00–0:30 | 6 % | Plan de 1 página, preguntas Q1–Q17 enviadas, repo Git + proyecto Supabase Cloud configurado | — | `chore: init repo y plan` |
+| F1 Base | 0:30–1:30 | 12.5 % | Angular 19 + Tailwind + supabase-js; login/registro/logout; guards; `0001_init.sql`; **deploy esqueleto en Servidor Visar con Nginx nativo** (`https://nora.vis7ar.com`, de-risk RF-27); prueba RLS con 2 usuarios vía `curl` | 01, 02, 03, 29, 27 | `feat(auth)`, `feat(db): init + RLS` |
 | F2 Tareas | 1:30–3:30 | 25 % | Form con validación; lista con 4 vistas (tabs); toggle de estado optimista con rollback; editar/eliminar con confirmación; skeleton/vacío/error; mobile 360 px; snapshot IndexedDB | 05–08, 10, 22, 25, (24 parcial) | `feat(tasks): ...` (3–5 commits) |
 | F3 Sorpresa | 3:30–4:00 | 6 % | Estimación y respuesta escrita al evaluador; `0002_supervisor.sql` + seed; filtro `assignee`/owner en la lista; selector de asignado en el form (solo supervisor) | CS-01 | `feat(db): supervisor + assignee` |
-| F4 Agente | 4:00–6:30 | 31 % | Edge `agent-chat` (adaptador LLM, tools, zod, loop, rate limit); `agent-confirm`; UI chat con burbujas, enlaces, opciones de desambiguación, confirmación, errores con reintento/"crear a mano" prellenado; historial; **3+ tests Deno** (fechas, validadores) | 12–20, 28, 30 | `feat(agent): ...` |
+| F4 Agente | 4:00–6:30 | 31 % | Edge `agent-chat` con Hono (adaptador LLM, tools, zod, loop, rate limit); `agent-confirm`; `auditMiddleware` no bloqueante con `EdgeRuntime.waitUntil()`; UI chat con burbujas, enlaces, opciones de desambiguación, confirmación, errores con reintento/"crear a mano" prellenado; historial; **3+ tests Deno** (fechas, validadores) | 12–20, 28, 30 | `feat(agent): ...` |
 | F5 PWA | 6:30–7:30 | 12.5 % | Manifest + íconos 192/512 (+maskable), ngsw, banner offline; prueba en Android/iOS real; vista "Equipo" para supervisor si quedó pendiente; nombre en el header | 23, 24, 27, 04 | `feat(pwa)` |
 | F6 Cierre | 7:30–8:00 | 6 % | README (setup, decisiones, ADRs, lo que quedó fuera), 2 usuarios + 1 supervisor, video 3–5 min | Entregables | `docs: README` |
 
 **Orden de recorte si hay desvío:** RF-26 → RF-11 → RF-21 → RF-09 (búsqueda) → UI "Equipo" dedicada (se queda el filtro en la lista) → RF-20 (UI del historial). **Nunca se recorta:** RLS, la validación de herramientas en el servidor, el manejo de errores de IA ni el deploy.
+
+### 5.1.1 Estrategia de Despliegue DevOps (Servidor Visar — 0 Docker)
+
+Para garantizar un entorno de producción ultraligero y de mantenimiento cero, el frontend PWA se aloja en el droplet Ubuntu de Visar (`159.203.103.8`, `vis7ar.com`) sirviendo archivos estáticos precompilados mediante **Nginx nativo**:
+
+#### A. Configuración de Host Virtual Nginx (`/etc/nginx/sites-available/nora.vis7ar.com`)
+```nginx
+server {
+    server_name nora.vis7ar.com;
+
+    root /var/www/nora.vis7ar.com/dist/nora/browser;
+    index index.html;
+
+    # Gzip compresión para PWA
+    gzip on;
+    gzip_types text/plain text/css application/json application/javascript text/xml application/xml+rss text/javascript image/svg+xml;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Cache estricto para assets estáticos con hash
+    location ~* \.(?:ico|css|js|gif|jpe?g|png|svg|woff2?)$ {
+        expires 1y;
+        add_header Cache-Control "public, max-age=31536000, immutable";
+    }
+
+    # Desactivar cache para ngsw.json e index.html
+    location ~* (ngsw\.json|index\.html)$ {
+        add_header Cache-Control "no-store, no-cache, must-revalidate";
+    }
+}
+```
+
+#### B. Script de Publicación Rápida (`deploy-visar.ps1`)
+```powershell
+Write-Host ">>> Compilando PWA Angular para Produccion..." -ForegroundColor Cyan
+ng build --configuration production
+
+Write-Host ">>> Sincronizando estaticos con Servidor Visar (159.203.103.8)..." -ForegroundColor Cyan
+scp -r ./dist/nora/* root@159.203.103.8:/var/www/nora.vis7ar.com/dist/nora/
+
+Write-Host ">>> Recargando Nginx en Visar..." -ForegroundColor Cyan
+ssh root@159.203.103.8 "sudo nginx -t && sudo systemctl reload nginx"
+
+Write-Host ">>> Despliegue completado con exito: https://nora.vis7ar.com" -ForegroundColor Green
+```
 
 ### 5.2 Matriz de Mitigación de Riesgos
 
@@ -806,7 +904,7 @@ flowchart LR
 | R6 | Cambio sorpresa consume el tiempo del agente | Baja (Mitigado) | Medio | **Diseño preventivo desde F0:** Como ya definimos los 2 roles y los menús ("Agenda" y "Gestión de Usuarios") desde el inicio, la llegada del cambio sorpresa a las 3:30 h no rompe el modelo ni retrasa el desarrollo del agente | Si el evaluador pide extras UI, mantener solo filtro en lista y documentar en README |
 | R7 | PWA en iOS (sin prompt de instalación, SW limitado) | Media | Medio | Instrucción "Compartir → Añadir a inicio"; probar en un dispositivo real temprano | Video en Android |
 | R8 | SW sirve datos o build viejos | Media | Medio | No cachear la API en el SW; `SwUpdate` con aviso "Nueva versión" | Desregistrar el SW desde el README |
-| R9 | Deploy falla al final | Baja | Crítico | Deploy en F1 y CI en cada push (Vercel) | Netlify como alternativa |
+| R9 | Deploy falla al final | Baja | Crítico | Deploy de esqueleto en F1 en Servidor Visar con Nginx y Certbot SSL (`https://nora.vis7ar.com`) | Servidor alternativo o Vercel como fallback |
 | R10 | Cold start de la Edge Function | Media | Bajo | Indicador "escribiendo…" y skeleton | — |
 | R11 | Medianoche: vistas desfasadas | Media | Medio | Reloj signal + `visibilitychange`; cálculo en la TZ del perfil | — |
 | R12 | Prompt injection ("borra todo") | Baja | Alto | Borrado siempre con confirmación de la UI; tools bajo RLS; sin borrado masivo | — |
@@ -837,8 +935,9 @@ flowchart LR
 - [ ] Prueba REST directa: con el JWT de A, `GET/PATCH/DELETE /rest/v1/tasks?id=eq.<tarea_de_B>` devuelve 0 filas o ninguna afectada.
 - [ ] `user_roles` no se puede escribir desde el cliente (intentar insertarse como supervisor → falla).
 - [ ] Tabla `audit_logs` **exclusiva para rol Supervisor/Admin**, con **filtro por usuario** y **paginación** (`PAGE_SIZE`).
-- [ ] Registro en tiempo real de cada INSERT, UPDATE y DELETE (vía trigger `tg_audit_log`) con snapshots `old_data` y `new_data`.
-- [ ] Registro de SELECT en `audit_logs` cuando el Supervisor consulta tareas de otros colaboradores o auditoría.
+- [ ] Registro desacoplado de operaciones (`INSERT`, `UPDATE`, `DELETE` y `SELECT` sensibles) vía `auditMiddleware` en Supabase Edge Functions con `EdgeRuntime.waitUntil()`.
+- [ ] **Cero triggers de auditoría en PostgreSQL** para evitar bloqueos y contención de transacciones.
+- [ ] Auditoría enriquecida con metadatos reales de conexión: IP del cliente (`x-forwarded-for` / `cf-connecting-ip`) y `user-agent`.
 - [ ] Borrado de usuario en cascada (`ON DELETE CASCADE`): eliminar a un usuario borra sus tareas, roles y mensajes, previa confirmación modal obligatoria.
 - [ ] Ninguna llave de IA en el bundle ni en Network (buscar en `dist/`); solo la `anon key`.
 - [ ] La Edge Function verifica el JWT, usa el cliente con el JWT del usuario y no expone `service_role`.
@@ -868,10 +967,10 @@ flowchart LR
 - [ ] ≥3 tests Deno verdes (`resolveRelativeDate`, `crearTareaSchema`, desambiguación/`listar` → `needs_clarification`).
 - [ ] `supabase db reset` recrea el esquema desde `supabase/migrations` + `seed.sql`.
 - [ ] Historial Git con commits frecuentes (≥10, mensajes convencionales).
-- [ ] URL pública abierta desde un celular real; PWA instalada.
+- [ ] URL pública en producción en Servidor Visar (`https://nora.vis7ar.com`) con SSL Certbot y Nginx nativo (0 Docker), probada y agregada a la pantalla de inicio de un celular real.
 
 ### Documentación y entrega
-- [ ] README: stack y ADRs (Angular + Edge Functions en vez de .NET, enums smallint, decisiones Q1–Q17), setup local, variables (`SUPABASE_URL`, `SUPABASE_ANON_KEY`; secrets `LLM_API_KEY`, `LLM_PROVIDER`), cómo correr los tests, lista honesta de lo que quedó fuera.
+- [ ] README: stack y ADRs (Angular 19 PWA + Supabase Cloud + Hono Edge Functions + Nginx Visar, enums smallint, decisiones Q1–Q17), setup local, variables (`SUPABASE_URL`, `SUPABASE_ANON_KEY`; secrets `LLM_API_KEY`, `LLM_PROVIDER`), script de despliegue (`deploy-visar.ps1`), cómo correr los tests, lista honesta de lo que quedó fuera.
 - [ ] Credenciales: usuario A, usuario B y supervisor S.
 - [ ] Video de 3–5 min: instalación en el celular, chat con multi-tarea, desambiguación, confirmación de borrado y offline.
 - [ ] Preparado para la revisión en vivo: explicar RLS, el loop del agente y la resolución de fechas; código modular para hacer un cambio pequeño rápido.
