@@ -33,10 +33,16 @@ PWA móvil donde un usuario escribe pendientes en lenguaje natural ("cobrarle a 
   - **Ficha Estándar y Trazabilidad Detallada:** Formato unificado de visualización de tareas con botón **"Ver información detallada"** para inspeccionar: quién la creó, fecha/hora exacta de creación, origen/canal (Asistente IA vs Manual), dispositivo/IP y última actualización.
   - **Módulo de Gestión de Usuarios:** CRUD completo para el Supervisor con drill-down a las tareas del colaborador (ver, editar y eliminar con confirmación modal). Cascada estricta: si se elimina un usuario, se eliminan todas sus tareas y mensajes asociados.
   - **Paquete Oficial de Iconos Nora:** Catálogo tipado de iconos SVG (`nora-spark`, `calendar-agenda`, `users-group`, `shield-audit`, `clock-time`, `check-task`, `info-detail`, `trash-delete`, `filter`, `mic-voice`) diseñados con el ADN del logo (trazos limpios, geometría moderna, acentos azul/violeta y destello IA).
-- **Backend e Infraestructura Cloud:**
-  - **Supabase Cloud (PaaS Gestionado):** Aloja la base de datos PostgreSQL en 5FN, Supabase Auth con JWT e infraestructura serverless de **Edge Functions (Deno / TypeScript + Hono Framework)**.
-  - **Despliegue Frontend Minimalista (Servidor Visar - 0 Docker):** Despliegue en el droplet de DigitalOcean de Visar (`159.203.103.8`, `vis7ar.com`) dedicado a portafolio y pruebas. Los archivos estáticos (`dist/`) se sirven directamente mediante **Nginx nativo** bajo el subdominio `https://nora.vis7ar.com` con HTTPS automático vía Let's Encrypt / Certbot. Cero consumo de RAM en el VPS para bases de datos o contenedores.
-  - **Pipeline Backend con Migraciones y Seeds Controlados:** Script `deploy-backend.ps1` que aplica automáticamente las migraciones DDL/DML pendientes en Postgres mediante `supabase db push`, soporta la inyección controlada de semillas idempotentes (`-WithSeed` vía `supabase db execute --file ./supabase/seed.sql` con `ON CONFLICT DO NOTHING`), y despliega las Edge Functions de Hono.
+- **Backend en Deno como Núcleo Autónomo y Escudo Protector (BFF):**
+  - **Cero Exposición de Supabase:** El frontend Angular **nunca se comunica directamente con Supabase (ni PostgREST ni DB)**. No se exponen credenciales de base de datos ni endpoints de Supabase al cliente. Supabase queda restringido como nuestra infraestructura privada de persistencia.
+  - **Backend Deno (Hono Framework):** Actúa como la única puerta de enlace autorizada (`https://nora.vis7ar.com/api/...`). Es el único componente que:
+    1. Intercepta todas las llamadas con `auditMiddleware` (captura IP real, User-Agent, consultas `SELECT` y mutaciones `DML` sin triggers en PostgreSQL).
+    2. Aplica validación estricta con Zod, resuelve roles y políticas de negocio.
+    3. Se comunica privadamente con PostgreSQL en 5FN y Supabase Auth mediante conexión de servidor segura.
+    4. Orquesta privadamente al agente de IA con **Google Gemini**, ejecutando el catálogo de herramientas (*Tool Calling*).
+    5. Permite diversificar y escalar nuevos servicios (webhooks, reportes, microservicios futuros) sin alterar la base de datos ni depender de la UI de Supabase.
+  - **Despliegue Cohesionado en Servidor Visar (0 Docker):** En el servidor Ubuntu de Visar (`159.203.103.8`, `vis7ar.com`), Nginx sirve los estáticos de la PWA Angular en `/` y enruta transparentemente las peticiones `/api/*` hacia el backend en Deno, unificando todo bajo el dominio seguro `https://nora.vis7ar.com` con SSL Certbot.
+  - **Pipeline Backend con Migraciones y Seeds Controlados:** Script `deploy-backend.ps1` que aplica automáticamente las migraciones DDL/DML pendientes en Postgres mediante `supabase db push`, soporta la inyección controlada de semillas idempotentes (`-WithSeed` vía `supabase db execute --file ./supabase/seed.sql` con `ON CONFLICT DO NOTHING`), y publica las funciones y servicios de Deno.
 - **Auditoría Desacoplada por Middleware (Sin Triggers SQL):**
   - Se sustituyen los triggers `tg_audit_log` de PostgreSQL por un **middleware en la capa de aplicación (`auditMiddleware` en Hono)**.
   - Permite auditar tanto mutaciones (`INSERT`, `UPDATE`, `DELETE`) como lecturas sensibles (`SELECT`), enriquecidas con metadatos HTTP reales (`ip_address`, `user_agent`, `duration_ms`).
@@ -135,48 +141,47 @@ PWA móvil donde un usuario escribe pendientes en lenguaje natural ("cobrarle a 
 ### 4.1 Componentes y responsabilidades
 
 ```mermaid
-flowchart LR
-  subgraph Cliente["PWA Angular 19 (Servidor Visar — Nginx nativo nora.vis7ar.com)"]
-    UI["features: auth, agenda, assistant, users-admin, audit"]
-    Store["Signal Stores + snapshot IndexedDB"]
-    SW["Angular Service Worker (ngsw)"]
+flowchart TD
+  subgraph Frontend["Frontend — PWA Angular 19 (Servidor Visar — nora.vis7ar.com)"]
+    UI["Vistas: Agenda, Asistente Chat, Gestión Usuarios, Auditoría"]
+    Store["Signal Stores (TaskStore, AuthStore)"]
+    SW["Angular Service Worker (ngsw) + Offline Cache"]
   end
-  subgraph SupabaseCloud["Supabase Cloud"]
-    Auth["Supabase Auth (JWT)"]
-    REST["PostgREST + RLS"]
-    subgraph EdgeFunctions["Edge Functions (Deno + Hono Framework)"]
-      EF1["agent-chat (Loop IA + Tool Calling)"]
-      EF2["agent-confirm (Acciones Destructivas)"]
-      AuditMW["auditMiddleware (Intercepta peticiones, no bloqueante)"]
-    end
-    DB[("PostgreSQL 5FN: profiles, user_roles, tasks, chat_messages, agent_pending_actions, audit_logs")]
+
+  subgraph DenoBFF["Backend Autónomo en Deno (Hono) — Núcleo y Escudo Protector"]
+    AuditMW["auditMiddleware (Captura IP real, User-Agent, SELECTs y DML)"]
+    Router["Router de API (/api/agenda, /api/tasks, /api/users, /api/audit)"]
+    AgentCore["Orquestador IA (Loop del Agente + Tool Calling)"]
+    SecLayer["Validación Zod + Extracción JWT + Verificación de Roles"]
   end
-  LLM["API IA (Gemini / Claude / OpenAI)"]
+
+  subgraph InfraPrivada["Infraestructura Interna y Privada (100% Oculta al Cliente)"]
+    SupaDB[("PostgreSQL 5FN (RLS, Tablas de Negocio, audit_logs)")]
+    SupaAuth["Supabase Auth (Servicio de Identidad)"]
+    Gemini["Google Gemini AI (API Privada con LLM_API_KEY)"]
+  end
 
   UI --> Store
-  Store -->|"CRUD con JWT + Headers"| AuditMW
-  AuditMW --> REST
-  AuditMW -.->|"EdgeRuntime.waitUntil (Async 0-lag)"| DB
-  UI -->|"functions.invoke con JWT"| EF1
-  UI -->|"confirmar acción"| EF2
-  EF1 -->|"cliente supabase con JWT (RLS)"| REST
-  EF2 --> REST
-  EF1 -->|"API key en secrets"| LLM
-  REST --> DB
-  Auth --> DB
+  Store -->|"ÚNICA CONEXIÓN EXTERNA: HTTPS Bearer JWT (/api/*)"| AuditMW
+  AuditMW --> SecLayer
+  SecLayer --> Router
+  Router <--> AgentCore
+
+  Router -.->|"Conexión Privada Servidor"| SupaDB
+  Router -.->|"Conexión Privada Servidor"| SupaAuth
+  AgentCore -.->|"Llamadas Seguras con Key Privada"| Gemini
 ```
 
-| Capa | Responsabilidad | Notas de seguridad / Rendimiento |
+| Capa | Responsabilidad | Notas de seguridad / Aislamiento |
 |---|---|---|
-| Frontend Angular 19 | UI, validación UX (Reactive Forms), stores, cálculo de vistas, offline snapshot | Solo `anon key` (pública). Desplegado en Visar (`nora.vis7ar.com`) con Nginx nativo. |
-| `core/` | `SupabaseClientService`, `AuthService` (signals), `authGuard`/`guestGuard`/`roleGuard`, `DateService` (TZ), `NetworkStatusService`, `AuditService` | |
-| `shared/` | `<app-icon>`, `ui-empty-state`, `ui-error-state`, `ui-skeleton`, `confirm-dialog` (confirmación destructiva modal), `field-error` | |
-| `layout/` | `AppShell` (header con selector mes/año, buscador, avatar, toggle de vistas Día/Semana/Mes, filtro por usuario para Admin, Bottom-Nav / Menú: Agenda / Gestión de Usuarios*), `OfflineBanner` | *Gestión de Usuarios solo visible para Admin/Supervisor |
-| `features/` | `auth`, `agenda` (calendario Día/Semana/Mes, grid con pills de tareas, filtros), `users-admin` (CRUD usuarios + vista de tareas por usuario + borrado en cascada), `assistant` (chat IA con tool calling), `audit` (visitas y mutaciones solo Admin) | Sin imports entre features |
-| Edge `auditMiddleware` (Hono) | Intercepta peticiones entrantes, extrae JWT, IP real y User-Agent; persiste en `audit_logs` con `EdgeRuntime.waitUntil()` | **Cero triggers en BD**. Permite auditar mutaciones y lecturas `SELECT` sin bloquear la respuesta. |
-| Edge `agent-chat` (Hono) | Loop del agente, definición de herramientas, validación (zod), ejecución vía cliente con JWT del usuario | Secret `LLM_API_KEY`; **sin service_role** para las herramientas |
-| Edge `agent-confirm` (Hono) | Ejecuta o cancela acciones pendientes (eliminar) | Valida dueño, estado y expiración |
-| Postgres (Supabase Cloud) | Integridad relacional (5FN, constraints), RLS estricto, triggers de negocio (`updated_at`, `completed_at`, perfil, guardas), borrado en cascada `ON DELETE CASCADE` | Sin triggers de auditoría (se delegan al middleware de Hono) |
+| **Frontend Angular 19** | UI, validación UX (Reactive Forms), Signal Stores, renderizado de calendario, offline cache | **Cero contacto directo con Supabase ni con APIs de IA**. Solo conoce `/api/...` de nuestro backend. Desplegado en Visar (`nora.vis7ar.com`). |
+| `core/` | `ApiService` (Base HTTP hacia `/api`), `AuthService` (signals de sesión), `authGuard`/`roleGuard`, `DateService` (TZ), `NetworkStatusService`, `AuditService` | Sin dependencias directas de SDKs que expongan la infraestructura. |
+| `shared/` | `<app-icon>`, `ui-empty-state`, `ui-error-state`, `ui-skeleton`, `confirm-dialog` (confirmación destructiva modal), `field-error` | Componentes reutilizables 100% standalone. |
+| `layout/` | `AppShell` (header con selector temporal, buscador, avatar, toggle de vistas Día/Semana/Mes, filtro por usuario para Admin, Bottom-Nav / Menú: Agenda / Gestión de Usuarios*), `OfflineBanner` | *Gestión de Usuarios solo visible para Admin/Supervisor. |
+| `features/` | `auth`, `agenda` (calendario Día/Semana/Mes, grid con pills de tareas, filtros), `users-admin` (CRUD usuarios + vista de tareas por usuario + borrado en cascada), `assistant` (chat IA con tool calling), `audit` (visitas y mutaciones solo Admin) | Módulos desacoplados sin imports cruzados. |
+| **Backend Deno (Hono Framework)** | **Escudo Protector, Orquestador y Núcleo de Auditoría**. Expone la API unificada `/api/*`, ejecuta `auditMiddleware` con `EdgeRuntime.waitUntil()`, orquesta el agente de Google Gemini, valida esquemas con Zod y gestiona Supabase privadamente. | **Cero triggers en BD**. Permite diversificar servicios (webhooks, reportes, integraciones) sin exponer la BD. |
+| **Supabase Cloud (Privado)** | Persistencia relacional en 5FN, políticas RLS, constraints de integridad, cascada `ON DELETE CASCADE`. | Accedido **exclusivamente** por nuestro Backend en Deno. Completamente invisible para el navegador. |
+| **Google Gemini API (Privado)** | Procesamiento de lenguaje natural, razonamiento y selección de herramientas (*Function Calling*). | Invocado **únicamente** por el backend con la `LLM_API_KEY` almacenada en secretos de servidor. |
 
 ### 4.1.1 Especificación Visual y de Interacción (Basada en Mockup)
 
@@ -863,8 +868,23 @@ server {
     gzip on;
     gzip_types text/plain text/css application/json application/javascript text/xml application/xml+rss text/javascript image/svg+xml;
 
+    # 1. Frontend Angular PWA
     location / {
         try_files $uri $uri/ /index.html;
+    }
+
+    # 2. Proxy Inverso hacia Backend Autónomo en Deno (Hono en puerto 3000)
+    # Angular NUNCA ve a Supabase; solo interactúa con /api/*
+    location /api/ {
+        proxy_pass http://127.0.0.1:3000/api/;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 60s;
     }
 
     # Cache estricto para assets estáticos con hash
@@ -880,21 +900,42 @@ server {
 }
 ```
 
-#### B. Script de Publicación Frontend en Visar (`deploy-visar.ps1`)
-```powershell
-Write-Host ">>> Compilando PWA Angular para Produccion..." -ForegroundColor Cyan
-ng build --configuration production
+#### B. Servicio Nativo Linux para Backend Deno (`/etc/systemd/system/nora-backend.service`) — 0 Docker
+El backend corre en segundo plano en Visar administrado por `systemd`, consumiendo menos de 40 MB de memoria:
+```ini
+[Unit]
+Description=Nora Deno Backend API (Hono)
+After=network.target
 
-Write-Host ">>> Sincronizando estaticos con Servidor Visar (159.203.103.8)..." -ForegroundColor Cyan
-scp -r ./dist/nora/* root@159.203.103.8:/var/www/nora.vis7ar.com/dist/nora/
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/var/www/nora.vis7ar.com/backend
+ExecStart=/root/.deno/bin/deno run --allow-net --allow-env --allow-read main.ts
+Restart=always
+RestartSec=5
+EnvironmentFile=/var/www/nora.vis7ar.com/backend/.env
 
-Write-Host ">>> Recargando Nginx en Visar..." -ForegroundColor Cyan
-ssh root@159.203.103.8 "sudo nginx -t && sudo systemctl reload nginx"
-
-Write-Host ">>> Despliegue Frontend completado con exito: https://nora.vis7ar.com" -ForegroundColor Green
+[Install]
+WantedBy=multi-user.target
 ```
 
-#### C. Script de Despliegue Backend con Migraciones y Seeds (`deploy-backend.ps1`)
+#### C. Script de Publicación Frontend y Backend en Visar (`deploy-visar.ps1`)
+```powershell
+Write-Host ">>> [1/3] Compilando PWA Angular para Produccion..." -ForegroundColor Cyan
+ng build --configuration production
+
+Write-Host ">>> [2/3] Sincronizando Frontend y Backend en Servidor Visar (159.203.103.8)..." -ForegroundColor Cyan
+scp -r ./dist/nora/* root@159.203.103.8:/var/www/nora.vis7ar.com/dist/nora/
+scp -r ./backend/* root@159.203.103.8:/var/www/nora.vis7ar.com/backend/
+
+Write-Host ">>> [3/3] Reiniciando servicio Deno y recargando Nginx..." -ForegroundColor Cyan
+ssh root@159.203.103.8 "systemctl restart nora-backend && sudo nginx -t && sudo systemctl reload nginx"
+
+Write-Host ">>> Despliegue completado con exito: https://nora.vis7ar.com" -ForegroundColor Green
+```
+
+#### D. Script de Despliegue Base de Datos con Migraciones y Seeds (`deploy-backend.ps1`)
 
 Por diseño de Supabase CLI, `supabase db push` **no ejecuta `seed.sql` automáticamente en entornos Cloud** para proteger la integridad de bases de datos remotas. Para automatizar el ciclo completo garantizando migraciones continuas y ejecución de semillas bajo demanda, se implementa el script unificado `deploy-backend.ps1`:
 

@@ -1,0 +1,61 @@
+# ==========================================
+# Nora Project — Master .gitignore
+# Frontend (Angular 19) + Backend (Supabase/Deno)
+# ==========================================
+
+# 1. Environment & Sensitive Credentials (CRÍTICO)
+.env
+.env.*
+*.env
+!.env.example
+*.pem
+*.key
+*.cert
+*.pfx
+
+# 2. Angular / Node Frontend
+node_modules/
+dist/
+.angular/
+.browserslistcache
+.sass-cache/
+coverage/
+.nx/
+
+# Package manager logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# 3. Deno & Supabase Backend
+.deno/
+supabase/.branches/
+supabase/.temp/
+.supabase/local/
+
+# 4. OS & System Files
+.DS_Store
+Thumbs.db
+desktop.ini
+$RECYCLE.BIN/
+
+# 5. IDEs & Editors
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+
+# 6. Build & Test Artifacts
+tmp/
+temp/
+out/
+build/
+*.tsbuildinfo

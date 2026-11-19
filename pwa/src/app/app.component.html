@@ -1,0 +1,96 @@
+<div class="min-h-screen bg-nora-bg-dark text-nora-text-primary flex flex-col font-sans selection:bg-nora-primary selection:text-white">
+  <!-- Header Superior -->
+  <header class="sticky top-0 z-40 bg-nora-surface-dark/95 backdrop-blur-md border-b border-nora-border-dark px-4 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <img src="assets/nora-logo-horizontal.svg" alt="Nora Logo" class="h-8 w-auto object-contain" />
+      <span class="text-xs px-2 py-0.5 rounded-full font-mono bg-nora-primary/20 text-nora-primary border border-nora-primary/30">
+        v0.1.0 • FASE 1
+      </span>
+    </div>
+
+    <!-- Switcher de Rol & Estado de Conexión -->
+    <div class="flex items-center gap-2">
+      <!-- Role Switcher -->
+      <button
+        (click)="auth.toggleRole()"
+        class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border"
+        [class]="auth.isSupervisor() ? 'bg-amber-950/60 border-amber-800 text-amber-200' : 'bg-blue-950/60 border-blue-800 text-blue-200'"
+        title="Alternar entre rol Miembro y Supervisor para pruebas"
+      >
+        <app-icon [name]="auth.isSupervisor() ? 'shield-audit' : 'users-group'" customClass="w-3.5 h-3.5" />
+        <span>{{ auth.isSupervisor() ? 'Supervisor' : 'Miembro' }}</span>
+        <span class="text-[10px] opacity-60">⇄</span>
+      </button>
+
+      <!-- Avatar Indicator -->
+      <div class="w-8 h-8 rounded-full bg-slate-800 border border-nora-border-dark flex items-center justify-center font-bold text-xs text-nora-primary">
+        {{ auth.currentUser()?.displayName?.substring(0, 1) || 'U' }}
+      </div>
+    </div>
+  </header>
+
+  <!-- Contenido Principal -->
+  <main class="flex-1 max-w-xl w-full mx-auto p-4 flex flex-col gap-4">
+    <!-- Banner de Estado de Arquitectura Fase 1 -->
+    <section class="bg-nora-surface-dark border border-nora-border-dark rounded-xl p-4 shadow-nora-card-dark flex flex-col gap-3">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <app-icon name="nora-spark" customClass="w-5 h-5 text-nora-ai-spark" />
+          <h2 class="text-sm font-semibold tracking-wide uppercase text-slate-300">
+            Arquitectura Base Inicializada
+          </h2>
+        </div>
+        <div class="flex items-center gap-1.5 text-xs">
+          @if (backendStatus() === 'checking') {
+            <span class="inline-block w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
+            <span class="text-amber-400 font-mono">Conectando...</span>
+          } @else if (backendStatus() === 'online') {
+            <span class="inline-block w-2 h-2 rounded-full bg-emerald-400"></span>
+            <span class="text-emerald-400 font-mono">Backend Deno Online</span>
+          } @else {
+            <span class="inline-block w-2 h-2 rounded-full bg-slate-500"></span>
+            <span class="text-slate-400 font-mono">Backend Standby</span>
+          }
+        </div>
+      </div>
+
+      <p class="text-xs text-slate-400 leading-relaxed">
+        El frontend <strong class="text-slate-200">Angular 19</strong> (Standalone, Signals, OnPush y Tailwind CSS) está listo y acoplado exclusivamente con nuestro <strong class="text-slate-200">Backend en Deno (Hono)</strong>, protegiendo a Supabase Cloud y a Google Gemini.
+      </p>
+
+      <!-- Checklist de Verificación Fase 1 -->
+      <div class="grid grid-cols-1 gap-2 pt-2 border-t border-nora-border-dark text-xs">
+        <div class="flex items-center gap-2 text-slate-300">
+          <span class="text-emerald-400 font-bold">✓</span>
+          <span>Estructura desacoplada: <code class="text-blue-400">/pwa</code> + <code class="text-blue-400">/backend (Deno)</code></span>
+        </div>
+        <div class="flex items-center gap-2 text-slate-300">
+          <span class="text-emerald-400 font-bold">✓</span>
+          <span>Middleware de auditoría en Deno (0 triggers en BD)</span>
+        </div>
+        <div class="flex items-center gap-2 text-slate-300">
+          <span class="text-emerald-400 font-bold">✓</span>
+          <span>Migraciones SQL base y seeds idempotentes listos</span>
+        </div>
+        <div class="flex items-center gap-2 text-slate-300">
+          <span class="text-emerald-400 font-bold">✓</span>
+          <span>Scripts de despliegue <code class="text-blue-400">deploy-backend.ps1</code> y <code class="text-blue-400">deploy-visar.ps1</code></span>
+        </div>
+      </div>
+
+      <div class="pt-2 flex items-center justify-between">
+        <button
+          (click)="checkBackendHealth()"
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs bg-nora-surface-elevatedDark hover:bg-slate-700 text-slate-200 rounded-lg transition-colors border border-nora-border-dark"
+        >
+          <app-icon name="clock-time" customClass="w-3.5 h-3.5 text-slate-400" />
+          <span>Reverificar Backend</span>
+        </button>
+        <span class="text-[11px] text-slate-500 font-mono">nora.vis7ar.com</span>
+      </div>
+    </section>
+
+    <!-- Router Outlet para Vistas de las Siguientes Fases -->
+    <router-outlet></router-outlet>
+  </main>
+</div>

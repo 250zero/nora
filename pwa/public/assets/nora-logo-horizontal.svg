@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 140" width="100%" height="100%">
+  <defs>
+    <linearGradient id="h-n-left" x1="0%" y1="100%" x2="0%" y2="0%">
+      <stop offset="0%" stop-color="#1D4ED8" />
+      <stop offset="100%" stop-color="#38BDF8" />
+    </linearGradient>
+    <linearGradient id="h-n-diag" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38BDF8" />
+      <stop offset="45%" stop-color="#2563EB" />
+      <stop offset="85%" stop-color="#7C3AED" />
+      <stop offset="100%" stop-color="#A855F7" />
+    </linearGradient>
+    <linearGradient id="h-n-right" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#C084FC" />
+      <stop offset="100%" stop-color="#7C3AED" />
+    </linearGradient>
+    <radialGradient id="h-spark-glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#38BDF8" stop-opacity="0.9" />
+      <stop offset="50%" stop-color="#818CF8" stop-opacity="0.3" />
+      <stop offset="100%" stop-color="#818CF8" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+
+  <!-- ISOTIPO (ICON) -->
+  <g transform="translate(10, 10)">
+    <!-- Base squircle -->
+    <rect width="120" height="120" rx="32" fill="#0B0F19" />
+    <rect width="118" height="118" x="1" y="1" rx="31" fill="none" stroke="#2A374A" stroke-width="1.5" />
+    
+    <!-- Stylized N -->
+    <!-- Left vertical -->
+    <path d="M38 32 C38 28.5 40.8 26 44.5 26 C48.2 26 51 28.5 51 32 L51 88 C51 91.5 48.2 94 44.5 94 C40.8 94 38 91.5 38 88 Z" fill="url(#h-n-left)" />
+    
+    <!-- Diagonal -->
+    <path d="M44.5 26 C47 26 49.5 27.5 51 30 L80 81 C81 83 83.5 84 86 84 C88.5 84 90.5 82.5 91 80 L92 70 C92.5 67 95.5 65 98.5 65.5 C101.5 66 103.5 69 103 72 L100 86 C98.5 91 94.5 94 89.5 94 C85.5 94 81.5 91.5 79.5 88 L50 37 C49 35.5 47 34.5 45 34.5 C42.5 34.5 40.5 36 40 38.5 L39 48 C38.5 51 35.5 53 32.5 52.5 C29.5 52 27.5 49 28 46 L31 32 C33 28 37 26 44.5 26 Z" fill="url(#h-n-diag)" opacity="0.95" />
+    
+    <!-- Right vertical -->
+    <path d="M79 40 C79 36.5 81.8 34 85.5 34 C89.2 34 92 36.5 92 40 L92 88 C92 91.5 89.2 94 85.5 94 C81.8 94 79 91.5 79 88 Z" fill="url(#h-n-right)" />
+    
+    <!-- Sparkle Glow -->
+    <circle cx="85.5" cy="32" r="18" fill="url(#h-spark-glow)" />
+    <!-- 4-point AI Star -->
+    <path d="M85.5 24 Q85.5 32 77.5 32 Q85.5 32 85.5 40 Q85.5 32 93.5 32 Q85.5 32 85.5 24 Z" fill="#FFFFFF" />
+  </g>
+
+  <!-- LOGOTIPO (WORDMARK) -->
+  <g transform="translate(155, 30)">
+    <!-- Brand Name: NORA -->
+    <text x="0" y="52" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" font-size="54" font-weight="800" letter-spacing="-0.03em" fill="#F8FAFC">
+      Nor<tspan fill="#38BDF8">a</tspan>
+    </text>
+    
+    <!-- AI Indicator dot -->
+    <circle cx="122" cy="18" r="4" fill="#A855F7" />
+
+    <!-- Subtitle / Tagline -->
+    <text x="2" y="76" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="600" letter-spacing="0.25em" fill="#94A3B8">
+      AI OPERATIONS ASSISTANT
+    </text>
+  </g>
+</svg>
