@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
-import { RouterOutlet } from '@angular/router';
+import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { ApiService } from './core/services/api.service';
 import { AuthService } from './core/services/auth.service';
 import { AppIconComponent } from './shared/components/app-icon/app-icon.component';
@@ -14,7 +14,7 @@ interface HealthResponse {
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet, AppIconComponent],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, AppIconComponent],
   templateUrl: './app.component.html',
   styleUrl: './app.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,

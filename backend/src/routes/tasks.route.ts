@@ -151,7 +151,7 @@ tasksRouter.post("/", async (c: Context) => {
     return c.json({ task: data }, 201);
   } catch (err: unknown) {
     if (err instanceof z.ZodError) {
-      return c.json({ error: "Datos inválidos", issues: err.issues }, 400);
+      return c.json({ error: "Datos inválidos", issues: err.errors }, 400);
     }
     return c.json({ error: "Error interno" }, 500);
   }
@@ -209,7 +209,7 @@ tasksRouter.put("/:id", async (c: Context) => {
     return c.json({ task: data });
   } catch (err: unknown) {
     if (err instanceof z.ZodError) {
-      return c.json({ error: "Datos inválidos", issues: err.issues }, 400);
+      return c.json({ error: "Datos inválidos", issues: err.errors }, 400);
     }
     return c.json({ error: "Error interno" }, 500);
   }

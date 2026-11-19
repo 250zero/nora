@@ -6,6 +6,7 @@ import { auditMiddleware } from "./src/middleware/audit.middleware.ts";
 import { agendaRouter } from "./src/routes/agenda.route.ts";
 import { healthRouter } from "./src/routes/health.route.ts";
 import { tasksRouter } from "./src/routes/tasks.route.ts";
+import { usersRouter } from "./src/routes/users.route.ts";
 
 const app = new Hono();
 
@@ -40,17 +41,20 @@ app.use("/api/*", auditMiddleware());
 app.route("/api/health", healthRouter);
 app.route("/api/tasks", tasksRouter);
 app.route("/api/agenda", agendaRouter);
+app.route("/api/users", usersRouter);
 
 // Ruta raíz informativa
 app.get("/", (c: Context) => {
   return c.json({
     name: "Nora Backend API",
-    version: "0.2.0",
+    version: "0.3.0",
     endpoints: [
       "/api/health",
       "/api/agenda",
       "/api/tasks",
       "/api/tasks/:id/detail",
+      "/api/users",
+      "/api/users/:id/tasks",
     ],
   });
 });

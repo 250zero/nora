@@ -1,0 +1,252 @@
+<div class="space-y-6">
+  <!-- Header de la sección -->
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-800 pb-5">
+    <div>
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400">
+          <app-icon name="users-group" customClass="w-5 h-5"></app-icon>
+        </div>
+        <div>
+          <h1 class="text-xl font-bold text-slate-100">Gestión de Usuarios</h1>
+          <p class="text-xs text-slate-400">Panel exclusivo para Supervisor / Administrador</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Indicador de rol activo y botón de refresco -->
+    <div class="flex items-center gap-3">
+      <button
+        (click)="loadUsers()"
+        class="inline-flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium rounded-lg border border-slate-700 transition"
+      >
+        <app-icon name="clock-time" customClass="w-3.5 h-3.5"></app-icon>
+        <span>Actualizar</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Alerta si no es Supervisor -->
+  @if (!auth.isSupervisor()) {
+    <div class="p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-start gap-3">
+      <div class="text-amber-400 mt-0.5">
+        <app-icon name="shield-audit" customClass="w-5 h-5"></app-icon>
+      </div>
+      <div>
+        <p class="text-xs font-semibold text-amber-300">Modo de rol: Miembro</p>
+        <p class="text-xs text-amber-200/80 mt-1">
+          Actualmente estás viendo la interfaz como Miembro. En la barra superior haz clic en
+          <strong class="text-amber-100 font-bold">"Rol: Miembro"</strong> para alternar a Supervisor y habilitar las funciones administrativas.
+        </p>
+      </div>
+    </div>
+  }
+
+  <!-- Error general -->
+  @if (error()) {
+    <div class="p-4 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-300 text-xs">
+      {{ error() }}
+    </div>
+  }
+
+  <!-- Loading State -->
+  @if (loading()) {
+    <div class="flex justify-center items-center py-16">
+      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-400"></div>
+    </div>
+  } @else {
+    <!-- Grid de colaboradores -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      @for (u of users(); track u.id) {
+        <div class="bg-slate-900 border border-slate-800 hover:border-slate-700/80 rounded-xl p-5 flex flex-col justify-between transition-all">
+          <div>
+            <!-- Top info -->
+            <div class="flex items-start justify-between gap-3 mb-3">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-sm text-indigo-400">
+                  {{ u.display_name.charAt(0).toUpperCase() }}
+                </div>
+                <div>
+                  <h3 class="font-semibold text-slate-200 text-sm leading-tight">{{ u.display_name }}</h3>
+                  <p class="text-xs text-slate-400 truncate max-w-[160px]">{{ u.email }}</p>
+                </div>
+              </div>
+
+              <!-- Badge de rol -->
+              <span
+                class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold tracking-wide uppercase"
+                [ngClass]="{
+                  'bg-purple-500/10 text-purple-300 border border-purple-500/20': u.role === 2,
+                  'bg-slate-800 text-slate-300 border border-slate-700': u.role === 1
+                }"
+              >
+                {{ u.role_label }}
+              </span>
+            </div>
+
+            <!-- Métricas de tareas -->
+            <div class="grid grid-cols-3 gap-2 my-4 p-3 bg-slate-950/60 rounded-lg border border-slate-800/80 text-center">
+              <div>
+                <p class="text-[10px] uppercase font-bold tracking-wider text-slate-500">Total</p>
+                <p class="text-base font-extrabold text-slate-200 mt-0.5">{{ u.tasks_stats.total }}</p>
+              </div>
+              <div>
+                <p class="text-[10px] uppercase font-bold tracking-wider text-amber-500">Pendientes</p>
+                <p class="text-base font-extrabold text-amber-300 mt-0.5">{{ u.tasks_stats.pending }}</p>
+              </div>
+              <div>
+                <p class="text-[10px] uppercase font-bold tracking-wider text-emerald-500">Listas</p>
+                <p class="text-base font-extrabold text-emerald-300 mt-0.5">{{ u.tasks_stats.completed }}</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Acciones -->
+          <div class="pt-3 border-t border-slate-800/80 flex items-center justify-between gap-2">
+            <button
+              (click)="viewUserTasks(u)"
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-400 hover:text-indigo-300 text-xs font-medium rounded-lg border border-indigo-500/20 transition"
+            >
+              <app-icon name="calendar-agenda" customClass="w-3.5 h-3.5"></app-icon>
+              <span>Ver tareas ({{ u.tasks_stats.total }})</span>
+            </button>
+
+            <!-- Botón de borrado crítico con modal de advertencia -->
+            <button
+              (click)="promptDeleteUser(u, $event)"
+              class="p-2 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-lg border border-transparent hover:border-rose-500/20 transition"
+              title="Eliminar usuario y todas sus tareas en cascada"
+            >
+              <app-icon name="trash-delete" customClass="w-4 h-4"></app-icon>
+            </button>
+          </div>
+        </div>
+      }
+    </div>
+  }
+
+  <!-- Drawer / Panel de Drill-down de tareas del colaborador seleccionado -->
+  @if (selectedUser()) {
+    <div class="fixed inset-0 z-40 bg-black/70 backdrop-blur-sm flex justify-end" (click)="closeTasksDrawer()">
+      <div
+        class="w-full max-w-lg bg-slate-900 border-l border-slate-800 h-full p-6 overflow-y-auto space-y-5 flex flex-col justify-between"
+        (click)="$event.stopPropagation()"
+      >
+        <div>
+          <!-- Cabecera del drawer -->
+          <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+            <div>
+              <p class="text-xs uppercase font-bold tracking-wider text-indigo-400">Drill-Down de Tareas</p>
+              <h2 class="text-lg font-bold text-slate-100 mt-0.5">{{ selectedUser()?.display_name }}</h2>
+              <p class="text-xs text-slate-400">{{ selectedUser()?.email }}</p>
+            </div>
+            <button
+              (click)="closeTasksDrawer()"
+              class="p-2 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition text-xs font-bold"
+            >
+              ✕
+            </button>
+          </div>
+
+          <!-- Lista de tareas -->
+          <div class="mt-5 space-y-3">
+            @if (loadingTasks()) {
+              <div class="flex justify-center py-10">
+                <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-400"></div>
+              </div>
+            } @else if (selectedUserTasks().length === 0) {
+              <div class="p-6 text-center bg-slate-950/40 border border-slate-800 rounded-xl text-slate-400 text-xs">
+                Este colaborador no tiene tareas registradas actualmente.
+              </div>
+            } @else {
+              @for (task of selectedUserTasks(); track task.id) {
+                <div class="p-3.5 bg-slate-950/60 border border-slate-800 rounded-xl hover:border-slate-700 transition">
+                  <div class="flex items-start justify-between gap-2">
+                    <h4 class="text-xs font-semibold text-slate-200">{{ task.title }}</h4>
+                    <span
+                      class="text-[10px] px-2 py-0.5 rounded-full font-medium"
+                      [ngClass]="{
+                        'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20': task.status === 3,
+                        'bg-amber-500/10 text-amber-400 border border-amber-500/20': task.status === 2,
+                        'bg-slate-800 text-slate-300 border border-slate-700': task.status === 1
+                      }"
+                    >
+                      {{ getStatusLabel(task.status) }}
+                    </span>
+                  </div>
+
+                  @if (task.description) {
+                    <p class="text-[11px] text-slate-400 mt-1 line-clamp-2">{{ task.description }}</p>
+                  }
+
+                  <div class="mt-2.5 flex items-center justify-between text-[10px] text-slate-500 pt-2 border-t border-slate-800/60">
+                    <span>Vencimiento: {{ task.due_date || 'Sin fecha' }} {{ task.due_time ? task.due_time.substring(0, 5) : '' }}</span>
+                    <span>Prioridad: {{ getPriorityLabel(task.priority) }}</span>
+                  </div>
+                </div>
+              }
+            }
+          </div>
+        </div>
+
+        <div class="pt-4 border-t border-slate-800">
+          <button
+            (click)="closeTasksDrawer()"
+            class="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-lg transition"
+          >
+            Cerrar panel
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- Modal Crítico de Confirmación de Borrado en Cascada -->
+  @if (userToDelete()) {
+    <div class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+      <div class="w-full max-w-md bg-slate-900 border border-rose-500/30 rounded-2xl p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
+        <!-- Icono de peligro -->
+        <div class="w-12 h-12 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 mx-auto">
+          <app-icon name="shield-audit" customClass="w-6 h-6"></app-icon>
+        </div>
+
+        <div class="text-center">
+          <h3 class="text-base font-bold text-slate-100">¿Eliminar colaborador definitivamente?</h3>
+          <p class="text-xs text-slate-300 mt-2">
+            Estás a punto de eliminar a <strong class="text-slate-100">{{ userToDelete()?.display_name }}</strong> ({{ userToDelete()?.email }}).
+          </p>
+        </div>
+
+        <!-- Advertencia explícita en rojo -->
+        <div class="p-3.5 bg-rose-950/40 border border-rose-600/40 rounded-xl">
+          <p class="text-xs text-rose-300 font-semibold leading-relaxed text-center">
+            ⚠️ Esta acción es irreversible y eliminará al usuario junto con todas sus tareas en cascada.
+          </p>
+        </div>
+
+        <!-- Botones de acción -->
+        <div class="grid grid-cols-2 gap-3 pt-2">
+          <button
+            (click)="cancelDelete()"
+            [disabled]="deleting()"
+            class="w-full py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl border border-slate-700 transition"
+          >
+            Cancelar
+          </button>
+
+          <button
+            (click)="confirmCascadeDelete()"
+            [disabled]="deleting()"
+            class="w-full py-2.5 px-4 bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold rounded-xl shadow-lg shadow-rose-900/30 transition flex items-center justify-center gap-2"
+          >
+            @if (deleting()) {
+              <div class="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-white"></div>
+              <span>Eliminando...</span>
+            } @else {
+              <span>Confirmar eliminación</span>
+            }
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+</div>
