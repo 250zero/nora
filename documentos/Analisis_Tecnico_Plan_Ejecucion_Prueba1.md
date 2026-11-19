@@ -20,7 +20,8 @@ PWA móvil donde un usuario escribe pendientes en lenguaje natural ("cobrarle a 
 | Auditoría | Desacoplada en la capa de aplicación con **middleware en Hono** (`auditMiddleware`) con `EdgeRuntime.waitUntil()`; **cero triggers SQL** de auditoría para evitar contención y permitir auditar `SELECT` con IP/User-Agent | Decisión Arq |
 | Arquitectura IA | El modelo **no escribe** en la BD; el backend ejecuta y valida cada herramienta (RF-14) | RF-14 |
 | IA | Proveedor: Claude, OpenAI o Gemini | Reglas |
-| Despliegue | Servidor Visar Ubuntu (`159.203.103.8`, `vis7ar.com`) con Nginx puro (0 Docker) en `https://nora.vis7ar.com`, con SSL Certbot, probada en celular real | RF-27, DevOps |
+| Despliegue Frontend | Servidor Visar Ubuntu (`159.203.103.8`, `vis7ar.com`) con Nginx puro (0 Docker) en `https://nora.vis7ar.com`, con SSL Certbot, probada en celular real | RF-27, DevOps |
+| Despliegue Backend | Script automatizado `deploy-backend.ps1`: ejecuta migraciones pendientes (`supabase db push`), soporta ejecución condicional de seeds idempotentes (`-WithSeed`) y publica Edge Functions | DevOps, RF-29 |
 | Código | Git con commits frecuentes; esquema SQL versionado que recrea las tablas desde cero (RF-29) | Reglas, RF-29 |
 | Zona horaria | Por defecto `America/Santo_Domingo` (UTC-4, sin horario de verano) | RF-19 |
 | Alcance | "Menos y funcionando" > "mucho a medias"; lo no hecho va al README | Reglas |
@@ -35,6 +36,7 @@ PWA móvil donde un usuario escribe pendientes en lenguaje natural ("cobrarle a 
 - **Backend e Infraestructura Cloud:**
   - **Supabase Cloud (PaaS Gestionado):** Aloja la base de datos PostgreSQL en 5FN, Supabase Auth con JWT e infraestructura serverless de **Edge Functions (Deno / TypeScript + Hono Framework)**.
   - **Despliegue Frontend Minimalista (Servidor Visar - 0 Docker):** Despliegue en el droplet de DigitalOcean de Visar (`159.203.103.8`, `vis7ar.com`) dedicado a portafolio y pruebas. Los archivos estáticos (`dist/`) se sirven directamente mediante **Nginx nativo** bajo el subdominio `https://nora.vis7ar.com` con HTTPS automático vía Let's Encrypt / Certbot. Cero consumo de RAM en el VPS para bases de datos o contenedores.
+  - **Pipeline Backend con Migraciones y Seeds Controlados:** Script `deploy-backend.ps1` que aplica automáticamente las migraciones DDL/DML pendientes en Postgres mediante `supabase db push`, soporta la inyección controlada de semillas idempotentes (`-WithSeed` vía `supabase db execute --file ./supabase/seed.sql` con `ON CONFLICT DO NOTHING`), y despliega las Edge Functions de Hono.
 - **Auditoría Desacoplada por Middleware (Sin Triggers SQL):**
   - Se sustituyen los triggers `tg_audit_log` de PostgreSQL por un **middleware en la capa de aplicación (`auditMiddleware` en Hono)**.
   - Permite auditar tanto mutaciones (`INSERT`, `UPDATE`, `DELETE`) como lecturas sensibles (`SELECT`), enriquecidas con metadatos HTTP reales (`ip_address`, `user_agent`, `duration_ms`).
@@ -878,7 +880,7 @@ server {
 }
 ```
 
-#### B. Script de Publicación Rápida (`deploy-visar.ps1`)
+#### B. Script de Publicación Frontend en Visar (`deploy-visar.ps1`)
 ```powershell
 Write-Host ">>> Compilando PWA Angular para Produccion..." -ForegroundColor Cyan
 ng build --configuration production
@@ -889,7 +891,95 @@ scp -r ./dist/nora/* root@159.203.103.8:/var/www/nora.vis7ar.com/dist/nora/
 Write-Host ">>> Recargando Nginx en Visar..." -ForegroundColor Cyan
 ssh root@159.203.103.8 "sudo nginx -t && sudo systemctl reload nginx"
 
-Write-Host ">>> Despliegue completado con exito: https://nora.vis7ar.com" -ForegroundColor Green
+Write-Host ">>> Despliegue Frontend completado con exito: https://nora.vis7ar.com" -ForegroundColor Green
+```
+
+#### C. Script de Despliegue Backend con Migraciones y Seeds (`deploy-backend.ps1`)
+
+Por diseño de Supabase CLI, `supabase db push` **no ejecuta `seed.sql` automáticamente en entornos Cloud** para proteger la integridad de bases de datos remotas. Para automatizar el ciclo completo garantizando migraciones continuas y ejecución de semillas bajo demanda, se implementa el script unificado `deploy-backend.ps1`:
+
+1. **Migraciones Continuas:** Aplica cambios DDL/DML pendientes en `supabase/migrations/` mediante `npx supabase db push`.
+2. **Ejecución Condicional de Seeds (`-WithSeed`):** Si se invoca con el parámetro `-WithSeed`, ejecuta `supabase/seed.sql` contra Supabase Cloud utilizando `npx supabase db execute --file ./supabase/seed.sql`.
+3. **Idempotencia Estricta en `seed.sql`:** Todas las sentencias del seed implementan `ON CONFLICT DO NOTHING` o `ON CONFLICT (id) DO UPDATE` para permitir re-ejecuciones seguras sin violar restricciones de clave primaria o única.
+4. **Despliegue de Edge Functions:** Publica las funciones del agente y middleware en Hono (`agent-chat`, `agent-confirm`).
+
+```powershell
+[CmdletBinding()]
+param(
+    [Parameter(Mandatory=$false)]
+    [switch]$WithSeed,
+
+    [Parameter(Mandatory=$false)]
+    [string]$ProjectRef = "your-supabase-project-id"
+)
+
+Write-Host "==========================================" -ForegroundColor Cyan
+Write-Host "🚀 Despliegue Backend Nora — Supabase Cloud" -ForegroundColor Cyan
+Write-Host "==========================================" -ForegroundColor Cyan
+
+# 1. Enlace con Supabase Cloud
+Write-Host "`n[1/4] Verificando enlace con Supabase Cloud..." -ForegroundColor Yellow
+npx supabase link --project-ref $ProjectRef
+
+# 2. Ejecutar Migraciones DDL/DML pendientes
+Write-Host "`n[2/4] Aplicando migraciones pendientes en PostgreSQL..." -ForegroundColor Yellow
+npx supabase db push
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "❌ Error al aplicar migraciones en Supabase Cloud. Despliegue abortado."
+    exit 1
+}
+Write-Host "✅ Migraciones aplicadas exitosamente." -ForegroundColor Green
+
+# 3. Ejecutar Seeds de forma controlada
+if ($WithSeed) {
+    Write-Host "`n[3/4] 🌱 Ejecutando Seeds idempotentes en Supabase Cloud..." -ForegroundColor Magenta
+    if (Test-Path "supabase/seed.sql") {
+        npx supabase db execute --file ./supabase/seed.sql
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "✅ Seeds aplicados exitosamente." -ForegroundColor Green
+        } else {
+            Write-Warning "⚠️ Advertencia al ejecutar seeds (verifique logs de constraints)."
+        }
+    } else {
+        Write-Warning "⚠️ Archivo supabase/seed.sql no encontrado."
+    }
+} else {
+    Write-Host "`n[3/4] ⏭️ Omitiendo seeds (ejecute con -WithSeed para sembrar datos demo)." -ForegroundColor DarkGray
+}
+
+# 4. Desplegar Edge Functions (Hono Framework)
+Write-Host "`n[4/4] Desplegando Edge Functions en Supabase..." -ForegroundColor Yellow
+npx supabase functions deploy agent-chat --no-verify-jwt
+npx supabase functions deploy agent-confirm --no-verify-jwt
+
+Write-Host "`n==========================================" -ForegroundColor Green
+Write-Host "🎉 Backend desplegado y sincronizado con exito!" -ForegroundColor Green
+Write-Host "==========================================" -ForegroundColor Green
+```
+
+##### Estándar Idempotente en `supabase/seed.sql`:
+```sql
+-- Perfiles base (Miembro y Supervisor de prueba)
+INSERT INTO public.profiles (id, display_name, email, timezone)
+VALUES 
+  ('a0000000-0000-0000-0000-000000000001', 'Juan Pérez (Miembro)', 'juan@nora.com', 'America/Santo_Domingo'),
+  ('a0000000-0000-0000-0000-000000000002', 'Ana Gómez (Supervisor)', 'ana@nora.com', 'America/Santo_Domingo')
+ON CONFLICT (id) DO UPDATE 
+SET display_name = EXCLUDED.display_name, email = EXCLUDED.email;
+
+-- Roles asignados
+INSERT INTO public.user_roles (user_id, role)
+VALUES 
+  ('a0000000-0000-0000-0000-000000000001', 1), -- Miembro
+  ('a0000000-0000-0000-0000-000000000002', 2)  -- Supervisor
+ON CONFLICT (user_id, role) DO NOTHING;
+
+-- Tareas de prueba con fechas dinámicas
+INSERT INTO public.tasks (id, owner_id, title, due_date, due_time, priority, status, source)
+VALUES 
+  ('b0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 'Cobrarle a cliente Juan', CURRENT_DATE, '10:00:00', 3, 1, 1),
+  ('b0000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000001', 'Enviar cotización a Ana', CURRENT_DATE + 1, '11:30:00', 2, 1, 2)
+ON CONFLICT (id) DO NOTHING;
 ```
 
 ### 5.2 Matriz de Mitigación de Riesgos
@@ -965,12 +1055,14 @@ Write-Host ">>> Despliegue completado con exito: https://nora.vis7ar.com" -Foreg
 
 ### Calidad y despliegue
 - [ ] ≥3 tests Deno verdes (`resolveRelativeDate`, `crearTareaSchema`, desambiguación/`listar` → `needs_clarification`).
-- [ ] `supabase db reset` recrea el esquema desde `supabase/migrations` + `seed.sql`.
+- [ ] `supabase db reset` recrea el esquema desde `supabase/migrations` + `seed.sql` en desarrollo local.
+- [ ] Pipeline `deploy-backend.ps1` probado contra Supabase Cloud: aplica migraciones (`db push`), soporta inyección de seeds idempotentes (`-WithSeed`) y publica Edge Functions.
+- [ ] Script `deploy-visar.ps1` probado: compila Angular PWA, transfiere por SCP y recarga Nginx en Visar.
 - [ ] Historial Git con commits frecuentes (≥10, mensajes convencionales).
 - [ ] URL pública en producción en Servidor Visar (`https://nora.vis7ar.com`) con SSL Certbot y Nginx nativo (0 Docker), probada y agregada a la pantalla de inicio de un celular real.
 
 ### Documentación y entrega
-- [ ] README: stack y ADRs (Angular 19 PWA + Supabase Cloud + Hono Edge Functions + Nginx Visar, enums smallint, decisiones Q1–Q17), setup local, variables (`SUPABASE_URL`, `SUPABASE_ANON_KEY`; secrets `LLM_API_KEY`, `LLM_PROVIDER`), script de despliegue (`deploy-visar.ps1`), cómo correr los tests, lista honesta de lo que quedó fuera.
+- [ ] README: stack y ADRs (Angular 19 PWA + Supabase Cloud + Hono Edge Functions + Nginx Visar, enums smallint, decisiones Q1–Q17), setup local, variables (`SUPABASE_URL`, `SUPABASE_ANON_KEY`; secrets `LLM_API_KEY`, `LLM_PROVIDER`), scripts de despliegue (`deploy-visar.ps1`, `deploy-backend.ps1`), cómo correr los tests, lista honesta de lo que quedó fuera.
 - [ ] Credenciales: usuario A, usuario B y supervisor S.
 - [ ] Video de 3–5 min: instalación en el celular, chat con multi-tarea, desambiguación, confirmación de borrado y offline.
 - [ ] Preparado para la revisión en vivo: explicar RLS, el loop del agente y la resolución de fechas; código modular para hacer un cambio pequeño rápido.
