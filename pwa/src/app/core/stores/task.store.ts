@@ -4,6 +4,8 @@ import { ApiService } from '../services/api.service';
 
 export type CalendarViewType = 'day' | 'week' | 'month';
 
+const OFFLINE_CACHE_KEY = 'nora_offline_tasks_cache_v1';
+
 @Injectable({
   providedIn: 'root',
 })
@@ -11,9 +13,34 @@ export class TaskStore {
   private readonly api = inject(ApiService);
 
   // Estado reactivo (Signals)
-  readonly tasks = signal<Task[]>([]);
+  readonly tasks = signal<Task[]>(this.getInitialCachedTasks());
   readonly isLoading = signal<boolean>(false);
   readonly errorMessage = signal<string | null>(null);
+  readonly isOnline = signal<boolean>(typeof navigator !== 'undefined' ? navigator.onLine : true);
+
+  constructor() {
+    if (typeof window !== 'undefined') {
+      window.addEventListener('online', () => this.isOnline.set(true));
+      window.addEventListener('offline', () => this.isOnline.set(false));
+    }
+  }
+
+  private getInitialCachedTasks(): Task[] {
+    if (typeof localStorage === 'undefined') return [];
+    try {
+      const raw = localStorage.getItem(OFFLINE_CACHE_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  private saveTasksToCache(tasks: Task[]): void {
+    if (typeof localStorage === 'undefined') return;
+    try {
+      localStorage.setItem(OFFLINE_CACHE_KEY, JSON.stringify(tasks));
+    } catch {}
+  }
 
   // Filtros de navegación
   readonly selectedView = signal<CalendarViewType>('month');
@@ -77,11 +104,17 @@ export class TaskStore {
       })
       .subscribe({
         next: (res) => {
-          this.tasks.set(res.tasks || []);
+          const list = res.tasks || [];
+          this.tasks.set(list);
+          this.saveTasksToCache(list);
           this.isLoading.set(false);
         },
         error: (err) => {
-          this.errorMessage.set('Error al sincronizar tareas con el backend.');
+          if (this.tasks().length > 0) {
+            this.errorMessage.set('Modo sin conexión: mostrando tareas guardadas localmente.');
+          } else {
+            this.errorMessage.set('Error al sincronizar tareas con el backend.');
+          }
           this.isLoading.set(false);
         },
       });

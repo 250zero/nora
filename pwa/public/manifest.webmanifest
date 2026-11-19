@@ -1,0 +1,17 @@
+{
+  "name": "Nora — Asistente de Agenda con IA",
+  "short_name": "Nora",
+  "description": "Asistente inteligente de agenda ejecutiva y tareas de equipo impulsada por Google Gemini",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0f1d",
+  "theme_color": "#4f46e5",
+  "icons": [
+    {
+      "src": "assets/nora-icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

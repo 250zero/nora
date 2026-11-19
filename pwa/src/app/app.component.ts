@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@ang
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { ApiService } from './core/services/api.service';
 import { AuthService } from './core/services/auth.service';
+import { TaskStore } from './core/stores/task.store';
 import { AssistantChatComponent } from './features/assistant/assistant-chat.component';
 import { AppIconComponent } from './shared/components/app-icon/app-icon.component';
 
@@ -22,6 +23,7 @@ interface HealthResponse {
 })
 export class AppComponent implements OnInit {
   protected readonly auth = inject(AuthService);
+  protected readonly taskStore = inject(TaskStore);
   private readonly api = inject(ApiService);
 
   readonly backendStatus = signal<'checking' | 'online' | 'offline'>('checking');

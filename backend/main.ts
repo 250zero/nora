@@ -4,6 +4,7 @@ import { logger } from "hono/logger";
 import { ENV } from "./src/config/env.ts";
 import { auditMiddleware } from "./src/middleware/audit.middleware.ts";
 import { agendaRouter } from "./src/routes/agenda.route.ts";
+import { auditRouter } from "./src/routes/audit.route.ts";
 import { chatRouter } from "./src/routes/chat.route.ts";
 import { healthRouter } from "./src/routes/health.route.ts";
 import { tasksRouter } from "./src/routes/tasks.route.ts";
@@ -44,12 +45,13 @@ app.route("/api/tasks", tasksRouter);
 app.route("/api/agenda", agendaRouter);
 app.route("/api/users", usersRouter);
 app.route("/api/chat", chatRouter);
+app.route("/api/audit-logs", auditRouter);
 
 // Ruta raíz informativa
 app.get("/", (c: Context) => {
   return c.json({
     name: "Nora Backend API",
-    version: "0.4.0",
+    version: "0.5.0",
     endpoints: [
       "/api/health",
       "/api/agenda",
@@ -59,6 +61,7 @@ app.get("/", (c: Context) => {
       "/api/users/:id/tasks",
       "/api/chat",
       "/api/chat/confirm-action",
+      "/api/audit-logs",
     ],
   });
 });

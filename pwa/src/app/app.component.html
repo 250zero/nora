@@ -7,7 +7,7 @@
           <img src="assets/nora-logo-horizontal.svg" alt="Nora Logo" class="h-8 w-auto object-contain" />
         </a>
         <span class="text-[11px] px-2 py-0.5 rounded-full font-mono bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-          v0.4.0 • FASE 4
+          v0.5.0 • FASE 5
         </span>
       </div>
 
@@ -29,10 +29,16 @@
             <a
               routerLink="/users"
               routerLinkActive="bg-purple-600 text-white font-medium"
-              class="px-3 py-1.5 rounded-lg text-purple-300 hover:text-white transition flex items-center gap-1.5"
+              class="px-2.5 py-1.5 rounded-lg text-purple-300 hover:text-white transition flex items-center gap-1.5"
             >
               <span>Usuarios</span>
-              <span class="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse"></span>
+            </a>
+            <a
+              routerLink="/audit"
+              routerLinkActive="bg-amber-600 text-white font-medium"
+              class="px-2.5 py-1.5 rounded-lg text-amber-300 hover:text-white transition flex items-center gap-1.5"
+            >
+              <span>Auditoría</span>
             </a>
           }
         </nav>
@@ -59,7 +65,18 @@
 
   <!-- Contenido Principal -->
   <main class="flex-1 max-w-4xl w-full mx-auto p-4 sm:p-6 flex flex-col gap-5">
-    <!-- Router Outlet para Vistas (Agenda / Usuarios) -->
+    <!-- Banner de Offline PWA -->
+    @if (!taskStore.isOnline()) {
+      <div class="p-3 bg-amber-500/15 border border-amber-500/30 rounded-xl flex items-center justify-between text-xs text-amber-300">
+        <div class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+          <span>Modo sin conexión activo — Tus tareas guardadas localmente están disponibles.</span>
+        </div>
+        <span class="text-[10px] font-mono opacity-80">Offline PWA</span>
+      </div>
+    }
+
+    <!-- Router Outlet para Vistas (Agenda / Usuarios / Auditoría) -->
     <router-outlet></router-outlet>
   </main>
 

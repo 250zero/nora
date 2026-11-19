@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { AgendaComponent } from './features/agenda/agenda.component';
+import { AuditLogsComponent } from './features/audit/audit-logs.component';
 import { UsersAdminComponent } from './features/users-admin/users-admin.component';
 
 export const routes: Routes = [
@@ -12,6 +13,11 @@ export const routes: Routes = [
     path: 'users',
     component: UsersAdminComponent,
     title: 'Gestión de Usuarios — Nora',
+  },
+  {
+    path: 'audit',
+    component: AuditLogsComponent,
+    title: 'Auditoría — Nora',
   },
   {
     path: '**',
