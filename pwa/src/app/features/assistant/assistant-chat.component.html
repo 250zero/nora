@@ -1,0 +1,172 @@
+<!-- Botón Flotante para Abrir el Asistente Nora -->
+<div class="fixed bottom-5 right-5 z-40">
+  <button
+    (click)="toggleOpen()"
+    class="relative flex items-center gap-2.5 px-4 py-3 bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-2xl shadow-xl shadow-indigo-500/25 border border-indigo-400/30 transition-all duration-200 transform hover:scale-105 active:scale-95 group"
+    aria-label="Abrir Asistente Nora con Inteligencia Artificial"
+  >
+    <div class="relative">
+      <app-icon name="nora-spark" customClass="w-5 h-5 text-amber-300 animate-pulse"></app-icon>
+      <span class="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-400 border-2 border-slate-900 rounded-full"></span>
+    </div>
+    <span class="text-xs font-bold tracking-wide">Pregúntale a Nora</span>
+  </button>
+</div>
+
+<!-- Modal / Ventana Flotante del Asistente Nora -->
+@if (isOpen()) {
+  <div class="fixed inset-0 sm:inset-auto sm:bottom-20 sm:right-5 z-50 sm:w-[420px] sm:h-[580px] w-full h-full bg-slate-900 border border-indigo-500/30 sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    <!-- Header del Chat -->
+    <div class="px-4 py-3.5 bg-slate-950/90 border-b border-slate-800 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="relative w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center text-white shadow-md shadow-indigo-500/20">
+          <app-icon name="nora-spark" customClass="w-4 h-4 text-amber-300"></app-icon>
+          <span class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-400 border-2 border-slate-950 rounded-full"></span>
+        </div>
+        <div>
+          <div class="flex items-center gap-1.5">
+            <h3 class="text-sm font-bold text-slate-100">Nora Asistente</h3>
+            <span class="text-[9px] px-1.5 py-0.2 rounded font-semibold bg-purple-500/20 text-purple-300 border border-purple-500/30">
+              Gemini
+            </span>
+          </div>
+          <p class="text-[11px] text-slate-400">Coordinadora inteligente de agenda</p>
+        </div>
+      </div>
+
+      <button
+        (click)="toggleOpen()"
+        class="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition text-xs font-bold"
+        title="Cerrar chat"
+      >
+        ✕
+      </button>
+    </div>
+
+    <!-- Contenedor de Mensajes con Scroll -->
+    <div
+      #messagesContainer
+      class="flex-1 p-4 overflow-y-auto space-y-3.5 bg-slate-950/40 text-xs"
+    >
+      @for (msg of messages(); track msg.id) {
+        @if (msg.sender === 'user') {
+          <!-- Mensaje del Usuario -->
+          <div class="flex justify-end">
+            <div class="max-w-[85%] bg-indigo-600 text-white rounded-2xl rounded-tr-xs px-3.5 py-2.5 shadow-sm">
+              <p class="leading-relaxed whitespace-pre-line">{{ msg.text }}</p>
+              <span class="text-[9px] text-indigo-200 block text-right mt-1 opacity-75">
+                {{ msg.timestamp | date:'shortTime' }}
+              </span>
+            </div>
+          </div>
+        } @else {
+          <!-- Mensaje de Nora -->
+          <div class="flex items-start gap-2.5">
+            <div class="w-6 h-6 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 shrink-0 mt-0.5">
+              <app-icon name="nora-spark" customClass="w-3.5 h-3.5"></app-icon>
+            </div>
+            <div class="max-w-[85%] space-y-2">
+              <div class="bg-slate-900 border border-slate-800 text-slate-200 rounded-2xl rounded-tl-xs px-3.5 py-2.5 shadow-sm">
+                <p class="leading-relaxed whitespace-pre-line">{{ msg.text }}</p>
+                <span class="text-[9px] text-slate-500 block mt-1">
+                  {{ msg.timestamp | date:'shortTime' }}
+                </span>
+              </div>
+
+              <!-- Sugerencias Interactivas de Horas Libres (Chips) -->
+              @if (msg.suggestedSlots && msg.suggestedSlots.length > 0) {
+                <div class="p-2.5 bg-slate-900/90 border border-indigo-500/20 rounded-xl space-y-1.5">
+                  <p class="text-[10px] uppercase font-bold tracking-wider text-indigo-300">
+                    🕒 Horarios disponibles detectados:
+                  </p>
+                  <div class="flex flex-wrap gap-1.5">
+                    @for (slot of msg.suggestedSlots; track slot) {
+                      <button
+                        (click)="selectSlot(slot)"
+                        [disabled]="isSending()"
+                        class="px-2.5 py-1 bg-indigo-600/20 hover:bg-indigo-600 text-indigo-200 hover:text-white rounded-lg border border-indigo-500/30 font-mono text-[11px] font-semibold transition"
+                      >
+                        {{ slot }}
+                      </button>
+                    }
+                  </div>
+                </div>
+              }
+
+              <!-- Tarjeta de Confirmación Crítica (ej. Borrado) -->
+              @if (msg.actionRequired) {
+                <div class="p-3 bg-rose-950/40 border border-rose-500/30 rounded-xl space-y-2">
+                  <div class="flex items-center gap-1.5 text-rose-300 font-semibold text-[11px]">
+                    <app-icon name="shield-audit" customClass="w-3.5 h-3.5"></app-icon>
+                    <span>Confirmación requerida</span>
+                  </div>
+                  <p class="text-[11px] text-slate-300">
+                    ¿Confirmas la eliminación definitiva de la tarea?
+                  </p>
+                  <div class="flex items-center gap-2 pt-1">
+                    <button
+                      (click)="confirmAction(msg, true)"
+                      [disabled]="isSending()"
+                      class="px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-lg font-semibold text-[11px] transition shadow-sm"
+                    >
+                      ✓ Sí, eliminar
+                    </button>
+                    <button
+                      (click)="confirmAction(msg, false)"
+                      [disabled]="isSending()"
+                      class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-[11px] transition border border-slate-700"
+                    >
+                      ✕ Cancelar
+                    </button>
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
+        }
+      }
+
+      <!-- Indicador de "Nora está pensando..." -->
+      @if (isSending()) {
+        <div class="flex items-center gap-2.5 text-slate-400">
+          <div class="w-6 h-6 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 shrink-0">
+            <app-icon name="nora-spark" customClass="w-3.5 h-3.5 animate-spin"></app-icon>
+          </div>
+          <div class="bg-slate-900 border border-slate-800 rounded-2xl rounded-tl-xs px-3.5 py-2 text-slate-400 text-xs flex items-center gap-2">
+            <span>Nora está procesando...</span>
+            <div class="flex gap-1">
+              <span class="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce"></span>
+              <span class="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce [animation-delay:0.2s]"></span>
+              <span class="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce [animation-delay:0.4s]"></span>
+            </div>
+          </div>
+        </div>
+      }
+    </div>
+
+    <!-- Input Footer del Chat -->
+    <div class="p-3 bg-slate-950 border-t border-slate-800">
+      <form
+        (submit)="$event.preventDefault(); sendMessage()"
+        class="flex items-center gap-2"
+      >
+        <input
+          type="text"
+          [ngModel]="inputMessage()"
+          (ngModelChange)="inputMessage.set($event)"
+          name="assistantInput"
+          placeholder="Ej: Agenda una reunión mañana..."
+          [disabled]="isSending()"
+          class="flex-1 bg-slate-900 border border-slate-800 focus:border-indigo-500 rounded-xl px-3.5 py-2 text-xs text-slate-100 placeholder-slate-500 outline-none transition"
+        />
+        <button
+          type="submit"
+          [disabled]="!inputMessage().trim() || isSending()"
+          class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:hover:bg-indigo-600 text-white font-semibold rounded-xl text-xs transition flex items-center justify-center"
+        >
+          Enviar
+        </button>
+      </form>
+    </div>
+  </div>
+}
