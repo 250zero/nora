@@ -1,99 +1,101 @@
-import { GoogleGenerativeAI, type FunctionDeclaration, SchemaType } from "@google/generative-ai";
 import { ENV } from "../config/env.ts";
 import { supabase } from "../config/supabase.ts";
 
-const genAI = new GoogleGenerativeAI(ENV.LLM_API_KEY || "dummy-key");
+const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent";
 
-// Definición de Tools para Gemini Function Calling
-const consultarHorasLibresTool: FunctionDeclaration = {
-  name: "consultar_horas_libres",
-  description: "Consulta los bloques de tiempo libres en la agenda de un usuario para una fecha específica (horario de 08:00 a 18:00)",
-  parameters: {
-    type: SchemaType.OBJECT,
-    properties: {
-      fecha: {
-        type: SchemaType.STRING,
-        description: "Fecha en formato YYYY-MM-DD para consultar disponibilidad",
+// Declaración de Tools para el payload REST de Gemini
+const toolsDeclaration = [
+  {
+    functionDeclarations: [
+      {
+        name: "consultar_horas_libres",
+        description: "Consulta los bloques de tiempo libres en la agenda de un usuario para una fecha específica (horario de 08:00 a 18:00)",
+        parameters: {
+          type: "OBJECT",
+          properties: {
+            fecha: {
+              type: "STRING",
+              description: "Fecha en formato YYYY-MM-DD para consultar disponibilidad",
+            },
+            duracion_minutos: {
+              type: "NUMBER",
+              description: "Duración estimada en minutos de la actividad (por defecto 60)",
+            },
+          },
+          required: ["fecha"],
+        },
       },
-      duracion_minutos: {
-        type: SchemaType.NUMBER,
-        description: "Duración estimada en minutos de la actividad (por defecto 60)",
+      {
+        name: "crear_tarea",
+        description: "Crea una nueva tarea o compromiso en la agenda del usuario",
+        parameters: {
+          type: "OBJECT",
+          properties: {
+            title: {
+              type: "STRING",
+              description: "Título o nombre descriptivo de la tarea o reunión",
+            },
+            due_date: {
+              type: "STRING",
+              description: "Fecha de vencimiento en formato YYYY-MM-DD",
+            },
+            due_time: {
+              type: "STRING",
+              description: "Hora en formato HH:mm (24 horas, ej. 09:30 o 15:00)",
+            },
+            priority: {
+              type: "NUMBER",
+              description: "Prioridad: 1=Baja, 2=Media, 3=Alta (por defecto 2)",
+            },
+            responsible_name: {
+              type: "STRING",
+              description: "Nombre del responsable o persona con quien es el compromiso",
+            },
+            description: {
+              type: "STRING",
+              description: "Detalles o notas adicionales sobre la tarea",
+            },
+          },
+          required: ["title", "due_date"],
+        },
       },
-    },
-    required: ["fecha"],
+      {
+        name: "listar_tareas",
+        description: "Lista las tareas o compromisos del usuario para una fecha o rango",
+        parameters: {
+          type: "OBJECT",
+          properties: {
+            fecha: {
+              type: "STRING",
+              description: "Fecha específica en formato YYYY-MM-DD",
+            },
+          },
+          required: ["fecha"],
+        },
+      },
+      {
+        name: "eliminar_tarea",
+        description: "Elimina una tarea existente por su ID tras confirmación",
+        parameters: {
+          type: "OBJECT",
+          properties: {
+            task_id: {
+              type: "STRING",
+              description: "ID UUID de la tarea a eliminar",
+            },
+            task_title: {
+              type: "STRING",
+              description: "Título de la tarea a eliminar para confirmar",
+            },
+          },
+          required: ["task_id"],
+        },
+      },
+    ],
   },
-};
+];
 
-const crearTareaTool: FunctionDeclaration = {
-  name: "crear_tarea",
-  description: "Crea una nueva tarea o compromiso en la agenda del usuario",
-  parameters: {
-    type: SchemaType.OBJECT,
-    properties: {
-      title: {
-        type: SchemaType.STRING,
-        description: "Título o nombre descriptivo de la tarea o reunión",
-      },
-      due_date: {
-        type: SchemaType.STRING,
-        description: "Fecha de vencimiento en formato YYYY-MM-DD",
-      },
-      due_time: {
-        type: SchemaType.STRING,
-        description: "Hora en formato HH:mm (24 horas, ej. 09:30 o 15:00)",
-      },
-      priority: {
-        type: SchemaType.NUMBER,
-        description: "Prioridad: 1=Baja, 2=Media, 3=Alta (por defecto 2)",
-      },
-      responsible_name: {
-        type: SchemaType.STRING,
-        description: "Nombre del responsable o persona con quien es el compromiso",
-      },
-      description: {
-        type: SchemaType.STRING,
-        description: "Detalles o notas adicionales sobre la tarea",
-      },
-    },
-    required: ["title", "due_date"],
-  },
-};
-
-const listarTareasTool: FunctionDeclaration = {
-  name: "listar_tareas",
-  description: "Lista las tareas o compromisos del usuario para una fecha o rango",
-  parameters: {
-    type: SchemaType.OBJECT,
-    properties: {
-      fecha: {
-        type: SchemaType.STRING,
-        description: "Fecha específica en formato YYYY-MM-DD",
-      },
-    },
-    required: ["fecha"],
-  },
-};
-
-const eliminarTareaTool: FunctionDeclaration = {
-  name: "eliminar_tarea",
-  description: "Elimina una tarea existente por su ID",
-  parameters: {
-    type: SchemaType.OBJECT,
-    properties: {
-      task_id: {
-        type: SchemaType.STRING,
-        description: "ID UUID de la tarea a eliminar",
-      },
-      task_title: {
-        type: SchemaType.STRING,
-        description: "Título de la tarea a eliminar para confirmar",
-      },
-    },
-    required: ["task_id"],
-  },
-};
-
-// Implementaciones de ejecución de cada Tool
+// Ejecución de Tools
 export async function executeTool(
   toolName: string,
   args: Record<string, any>,
@@ -102,7 +104,6 @@ export async function executeTool(
   switch (toolName) {
     case "consultar_horas_libres": {
       const fecha = args.fecha;
-      // Consultar tareas existentes para esa fecha y usuario
       const { data: tasks, error } = await supabase
         .from("tasks")
         .select("due_time, duration_minutes, title")
@@ -114,7 +115,6 @@ export async function executeTool(
         return { result: { error: error.message } };
       }
 
-      // Horas base de oficina: 08:00, 09:00, 10:00, 11:00, 14:00, 15:00, 16:00, 17:00
       const standardSlots = [
         "08:30",
         "10:00",
@@ -150,7 +150,7 @@ export async function executeTool(
         responsible_name: args.responsible_name || null,
         description: args.description || null,
         status: 1, // Pendiente
-        source: 2, // 2 = Creada vía IA Nora
+        source: 2, // 2 = Creada vía Asistente IA Nora
       };
 
       const { data, error } = await supabase
@@ -206,7 +206,7 @@ export async function executeTool(
   }
 }
 
-// Orquestador principal de Chat con Gemini
+// Orquestador principal de Chat usando fetch nativo de Deno
 export async function chatWithNora(
   userMessage: string,
   userId: string,
@@ -217,7 +217,6 @@ export async function chatWithNora(
   actionRequired?: any;
   toolExecuted?: string;
 }> {
-  // Construir contexto temporal en America/Santo_Domingo
   const now = new Date();
   const options: Intl.DateTimeFormatOptions = {
     timeZone: "America/Santo_Domingo",
@@ -231,7 +230,7 @@ export async function chatWithNora(
   const currentDateStr = new Intl.DateTimeFormat("es-DO", options).format(now);
   const currentIsoDate = now.toISOString().split("T")[0];
 
-  const systemInstruction = `
+  const systemPrompt = `
 Eres Nora, una asistente ejecutiva inteligente, empática y de alta precisión especializada en la gestión de agenda personal y de equipo.
 Zona horaria del sistema: America/Santo_Domingo (UTC-4, hora local de República Dominicana).
 Fecha y hora actual: ${currentDateStr} (ISO: ${currentIsoDate}).
@@ -249,74 +248,130 @@ REGLAS ESTRICTAS DE COMPORTAMIENTO:
    - Profesional, conciso, cálido y enfocado en la productividad.
 `;
 
-  const model = genAI.getGenerativeModel({
-    model: "gemini-3.8-flash",
-    systemInstruction,
-    tools: [
-      {
-        functionDeclarations: [
-          consultarHorasLibresTool,
-          crearTareaTool,
-          listarTareasTool,
-          eliminarTareaTool,
-        ],
-      },
-    ],
-  });
+  // Construir historial de mensajes en formato Gemini
+  const contents = [
+    ...history.map((h) => ({
+      role: h.role,
+      parts: [{ text: h.text }],
+    })),
+    {
+      role: "user",
+      parts: [{ text: userMessage }],
+    },
+  ];
+
+  const payload = {
+    systemInstruction: {
+      parts: [{ text: systemPrompt }],
+    },
+    contents,
+    tools: toolsDeclaration,
+  };
 
   try {
-    // Iniciar chat con historial reciente
-    const chat = model.startChat({
-      history: history.map((h) => ({
-        role: h.role,
-        parts: [{ text: h.text }],
-      })),
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 90000); // 90s timeout para razonamiento completo
 
-    const result = await chat.sendMessage(userMessage);
-    const response = await result.response;
-    const functionCalls = response.functionCalls();
+    const resp = await fetch(`${GEMINI_API_URL}?key=${ENV.LLM_API_KEY}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+
+    if (!resp.ok) {
+      const errText = await resp.text();
+      throw new Error(`Google AI API Error [${resp.status}]: ${errText}`);
+    }
+
+    const data = await resp.json();
+    const candidate = data.candidates?.[0];
+    const parts = candidate?.content?.parts || [];
+
+    let replyText = "";
+    let functionCall: any = null;
+
+    for (const part of parts) {
+      if (part.text) {
+        replyText += part.text;
+      }
+      if (part.functionCall) {
+        functionCall = part.functionCall;
+      }
+    }
 
     let suggestedSlots: string[] | undefined;
     let actionRequired: any = undefined;
     let toolExecuted: string | undefined;
 
-    if (functionCalls && functionCalls.length > 0) {
-      const call = functionCalls[0];
-      toolExecuted = call.name;
+    if (functionCall) {
+      const toolName = functionCall.name;
+      const toolArgs = functionCall.args || {};
+      toolExecuted = toolName;
 
-      // Si es eliminar y no fue confirmado por el usuario en el mensaje
-      if (call.name === "eliminar_tarea" && !userMessage.toLowerCase().includes("confirmo")) {
+      // Si es eliminar y no fue confirmado
+      if (toolName === "eliminar_tarea" && !userMessage.toLowerCase().includes("confirmo")) {
         actionRequired = {
           type: "confirm_delete",
-          taskId: (call.args as any)?.task_id,
-          taskTitle: (call.args as any)?.task_title || "esta tarea",
+          taskId: toolArgs.task_id,
+          taskTitle: toolArgs.task_title || "esta tarea",
         };
         return {
-          reply: `¿Estás seguro de que deseas eliminar la tarea "${actionRequired.taskTitle}"? Esta acción no se puede deshacer.`,
+          reply: `¿Estás seguro de que deseas eliminar la tarea "${actionRequired.taskTitle}"? Esta acción es definitiva e irreversible.`,
           actionRequired,
           toolExecuted: "confirm_pending",
         };
       }
 
-      // Ejecutar la tool
-      const toolOutput = await executeTool(call.name, call.args as Record<string, any>, userId);
+      // Ejecutar tool
+      const toolOutput = await executeTool(toolName, toolArgs, userId);
       suggestedSlots = toolOutput.suggestedSlots;
       actionRequired = toolOutput.actionRequired;
 
-      // Devolver el resultado de la función al modelo para la respuesta final en lenguaje natural
-      const followUp = await chat.sendMessage([
-        {
-          functionResponse: {
-            name: call.name,
-            response: toolOutput.result,
-          },
+      // Enviar resultado de la tool para respuesta natural final
+      const followUpPayload = {
+        systemInstruction: {
+          parts: [{ text: systemPrompt }],
         },
-      ]);
+        contents: [
+          ...contents,
+          candidate.content,
+          {
+            role: "user",
+            parts: [
+              {
+                functionResponse: {
+                  name: toolName,
+                  response: toolOutput.result,
+                },
+              },
+            ],
+          },
+        ],
+      };
 
-      const finalReply = followUp.response.text();
+      const followUpResp = await fetch(`${GEMINI_API_URL}?key=${ENV.LLM_API_KEY}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(followUpPayload),
+      });
+
+      if (followUpResp.ok) {
+        const followUpData = await followUpResp.json();
+        const followParts = followUpData.candidates?.[0]?.content?.parts || [];
+        replyText = followParts.map((p: any) => p.text || "").join("");
+      } else {
+        if (toolName === "consultar_horas_libres") {
+          replyText = `He consultado tu agenda para el ${toolArgs.fecha}. Dispones de los siguientes horarios libres para agendar:\n` +
+            (suggestedSlots?.map((s) => `• ${s}`).join("\n") || "Sin horarios disponibles");
+        } else if (toolName === "crear_tarea") {
+          replyText = `¡Listo! He registrado la tarea "${toolArgs.title}" en tu agenda para el ${toolArgs.due_date} ${toolArgs.due_time ? 'a las ' + toolArgs.due_time : ''}.`;
+        }
+      }
+
       return {
-        reply: finalReply,
+        reply: replyText || "Acción completada con éxito.",
         suggestedSlots,
         actionRequired,
         toolExecuted,
@@ -324,14 +379,14 @@ REGLAS ESTRICTAS DE COMPORTAMIENTO:
     }
 
     return {
-      reply: response.text(),
+      reply: replyText || "¡Hola! Estoy lista para ayudarte con tu agenda y tareas. ¿Qué coordinamos hoy?",
       suggestedSlots,
       actionRequired,
     };
   } catch (err: any) {
-    console.error("Error en llamada a Gemini API:", err);
+    console.error("Error en chatWithNora:", err);
     return {
-      reply: `Lo siento, ocurrió un inconveniente al comunicarme con mi servicio de inteligencia artificial: ${err.message || "Error desconocido"}. Por favor verifica la clave o intenta nuevamente.`,
+      reply: `Disculpa, hubo una dificultad al comunicarme con Google Gemini: ${err.message}.`,
     };
   }
 }

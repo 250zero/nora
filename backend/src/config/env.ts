@@ -1,10 +1,14 @@
 import { load } from "@std/dotenv";
 
-// Cargar variables de .env si existe localmente
-try {
-  await load({ export: true, envPath: "../.env" });
-} catch {
-  // En producción o contenedor las variables vienen directo de Deno.env
+// Cargar variables de .env buscando en rutas relativas comunes
+const envPaths = ["../.env", "../../.env", "./.env"];
+for (const p of envPaths) {
+  try {
+    await load({ export: true, envPath: p });
+    break;
+  } catch {
+    // Continuar buscando
+  }
 }
 
 export const ENV = {

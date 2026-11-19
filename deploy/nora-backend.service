@@ -6,10 +6,11 @@ After=network.target
 Type=simple
 User=root
 WorkingDirectory=/var/www/nora.vis7ar.com/backend
+EnvironmentFile=/var/www/nora.vis7ar.com/backend/.env
 ExecStart=/root/.deno/bin/deno run --allow-net --allow-env --allow-read main.ts
 Restart=always
 RestartSec=3
-Environment=PORT=3000
+Environment=PORT=3001
 Environment=NODE_ENV=production
 
 [Install]
