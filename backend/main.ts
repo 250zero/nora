@@ -3,7 +3,9 @@ import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { ENV } from "./src/config/env.ts";
 import { auditMiddleware } from "./src/middleware/audit.middleware.ts";
+import { agendaRouter } from "./src/routes/agenda.route.ts";
 import { healthRouter } from "./src/routes/health.route.ts";
+import { tasksRouter } from "./src/routes/tasks.route.ts";
 
 const app = new Hono();
 
@@ -13,7 +15,6 @@ app.use(
   "*",
   cors({
     origin: (origin: string | undefined) => {
-      // Permitir localhost, IP directa de Visar y dominio oficial
       if (
         !origin ||
         origin.includes("localhost") ||
@@ -25,7 +26,7 @@ app.use(
       return "https://nora.vis7ar.com";
     },
     allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowHeaders: ["Content-Type", "Authorization", "X-Active-Role"],
+    allowHeaders: ["Content-Type", "Authorization", "X-Active-Role", "X-User-Id"],
     exposeHeaders: ["Content-Length", "X-Request-Id"],
     maxAge: 86400,
     credentials: true,
@@ -35,15 +36,22 @@ app.use(
 // Middleware de auditoría desacoplada (registra DML y lecturas sin triggers en BD)
 app.use("/api/*", auditMiddleware());
 
-// Rutas base
+// Rutas de la API
 app.route("/api/health", healthRouter);
+app.route("/api/tasks", tasksRouter);
+app.route("/api/agenda", agendaRouter);
 
 // Ruta raíz informativa
 app.get("/", (c: Context) => {
   return c.json({
     name: "Nora Backend API",
-    version: "0.1.0",
-    docs: "/api/health",
+    version: "0.2.0",
+    endpoints: [
+      "/api/health",
+      "/api/agenda",
+      "/api/tasks",
+      "/api/tasks/:id/detail",
+    ],
   });
 });
 

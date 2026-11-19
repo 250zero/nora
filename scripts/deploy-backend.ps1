@@ -4,11 +4,35 @@ param(
     [switch]$WithSeed,
 
     [Parameter(Mandatory=$false)]
-    [string]$ProjectRef = "ynzacwphooadldutrjeq"
+    [string]$ProjectRef = ""
 )
+
+# Cargar variables de entorno desde el .env raíz
+$EnvFile = "$PSScriptRoot\..\.env"
+if (Test-Path $EnvFile) {
+    Get-Content $EnvFile | ForEach-Object {
+        $line = $_.Trim()
+        if ($line -and -not $line.StartsWith("#") -and $line.Contains("=")) {
+            $parts = $line.Split("=", 2)
+            $name = $parts[0].Trim()
+            $val = $parts[1].Trim()
+            [System.Environment]::SetEnvironmentVariable($name, $val, "Process")
+        }
+    }
+}
+
+if (-not $ProjectRef) {
+    $ProjectRef = [System.Environment]::GetEnvironmentVariable("SUPABASE_PROJECT_REF")
+}
+
+if (-not $ProjectRef) {
+    Write-Error "❌ Error: SUPABASE_PROJECT_REF no está definido en el archivo .env ni fue suministrado como parámetro."
+    exit 1
+}
 
 Write-Host "==========================================" -ForegroundColor Cyan
 Write-Host "🚀 Despliegue Backend Nora — Supabase Cloud" -ForegroundColor Cyan
+Write-Host "   Proyecto: $ProjectRef" -ForegroundColor DarkGray
 Write-Host "==========================================" -ForegroundColor Cyan
 
 # 1. Enlace con Supabase Cloud
@@ -27,8 +51,8 @@ Write-Host "✅ Migraciones aplicadas exitosamente." -ForegroundColor Green
 # 3. Ejecutar Seeds de forma controlada
 if ($WithSeed) {
     Write-Host "`n[3/3] 🌱 Ejecutando Seeds idempotentes en Supabase Cloud..." -ForegroundColor Magenta
-    if (Test-Path "supabase/seed.sql") {
-        npx supabase db execute --file ./supabase/seed.sql
+    if (Test-Path "$PSScriptRoot\..\supabase\seed.sql") {
+        npx supabase db execute --file "$PSScriptRoot\..\supabase\seed.sql"
         if ($LASTEXITCODE -eq 0) {
             Write-Host "✅ Seeds aplicados exitosamente." -ForegroundColor Green
         } else {
