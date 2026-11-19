@@ -5,6 +5,7 @@ import { ENV } from "./src/config/env.ts";
 import { auditMiddleware } from "./src/middleware/audit.middleware.ts";
 import { agendaRouter } from "./src/routes/agenda.route.ts";
 import { auditRouter } from "./src/routes/audit.route.ts";
+import { authRouter } from "./src/routes/auth.route.ts";
 import { chatRouter } from "./src/routes/chat.route.ts";
 import { healthRouter } from "./src/routes/health.route.ts";
 import { tasksRouter } from "./src/routes/tasks.route.ts";
@@ -41,6 +42,7 @@ app.use("/api/*", auditMiddleware());
 
 // Rutas de la API
 app.route("/api/health", healthRouter);
+app.route("/api/auth", authRouter);
 app.route("/api/tasks", tasksRouter);
 app.route("/api/agenda", agendaRouter);
 app.route("/api/users", usersRouter);
@@ -51,9 +53,13 @@ app.route("/api/audit-logs", auditRouter);
 app.get("/", (c: Context) => {
   return c.json({
     name: "Nora Backend API",
-    version: "0.5.0",
+    version: "0.5.1",
     endpoints: [
       "/api/health",
+      "/api/auth/login",
+      "/api/auth/register",
+      "/api/auth/me",
+      "/api/auth/logout",
       "/api/agenda",
       "/api/tasks",
       "/api/tasks/:id/detail",

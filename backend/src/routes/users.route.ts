@@ -4,7 +4,7 @@ import { supabase } from "../config/supabase.ts";
 export const usersRouter = new Hono();
 
 // Middleware simple para verificar rol Supervisor
-usersRouter.use("*", async (c: Context, next: () => Promise<void>) => {
+usersRouter.use("*", async (c: Context, next) => {
   const activeRole = c.req.header("X-Active-Role");
   // En modo MVP se valida el rol activo enviado en el header del token
   if (activeRole !== "2") {
@@ -49,7 +49,7 @@ usersRouter.get("/", async (c: Context) => {
     taskCountMap.set(t.owner_id, current);
   }
 
-  const result = (profiles || []).map((p: Record<string, any>) => {
+  const result = (profiles || []).map((p) => {
     const stats = taskCountMap.get(p.id) || { total: 0, pending: 0, completed: 0 };
     const roleId = rolesMap.get(p.id) || 1;
     return {
@@ -105,3 +105,4 @@ usersRouter.delete("/:id", async (c: Context) => {
     message: "Usuario y todas sus tareas asociadas eliminados en cascada exitosamente",
   });
 });
+

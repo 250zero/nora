@@ -1,72 +1,87 @@
 <div class="min-h-screen bg-nora-bg-dark text-nora-text-primary flex flex-col font-sans selection:bg-nora-primary selection:text-white">
-  <!-- Header Superior -->
-  <header class="sticky top-0 z-40 bg-nora-surface-dark/95 backdrop-blur-md border-b border-nora-border-dark px-4 py-3">
-    <div class="max-w-4xl mx-auto flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <a routerLink="/" class="flex items-center gap-2">
-          <img src="assets/nora-logo-horizontal.svg" alt="Nora Logo" class="h-8 w-auto object-contain" />
-        </a>
-        <span class="text-[11px] px-2 py-0.5 rounded-full font-mono bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-          v0.5.0 • FASE 5
-        </span>
-      </div>
-
-      <!-- Navegación & Switcher de Rol -->
-      <div class="flex items-center gap-2 sm:gap-3">
-        <!-- Enlaces de Navegación -->
-        <nav class="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800 text-xs">
-          <a
-            routerLink="/"
-            routerLinkActive="bg-indigo-600 text-white font-medium"
-            [routerLinkActiveOptions]="{ exact: true }"
-            class="px-3 py-1.5 rounded-lg text-slate-400 hover:text-slate-200 transition"
-          >
-            Agenda
+  <!-- Header Superior (Solo visible si está autenticado) -->
+  @if (auth.isAuthenticated()) {
+    <header class="sticky top-0 z-40 bg-nora-surface-dark/95 backdrop-blur-md border-b border-nora-border-dark px-4 py-3">
+      <div class="max-w-4xl mx-auto flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <a routerLink="/" class="flex items-center gap-2">
+            <img src="assets/nora-logo-horizontal.svg" alt="Nora Logo" class="h-8 w-auto object-contain" />
           </a>
+          <span class="text-[11px] px-2 py-0.5 rounded-full font-mono bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+            v1.0.0
+          </span>
+        </div>
 
-          <!-- Solo visible / destacado para Supervisor -->
-          @if (auth.isSupervisor()) {
+        <!-- Navegación & Switcher de Rol & Salir -->
+        <div class="flex items-center gap-2 sm:gap-3">
+          <!-- Enlaces de Navegación -->
+          <nav class="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800 text-xs">
             <a
-              routerLink="/users"
-              routerLinkActive="bg-purple-600 text-white font-medium"
-              class="px-2.5 py-1.5 rounded-lg text-purple-300 hover:text-white transition flex items-center gap-1.5"
+              routerLink="/"
+              routerLinkActive="bg-indigo-600 text-white font-medium"
+              [routerLinkActiveOptions]="{ exact: true }"
+              class="px-3 py-1.5 rounded-lg text-slate-400 hover:text-slate-200 transition"
             >
-              <span>Usuarios</span>
+              Agenda
             </a>
-            <a
-              routerLink="/audit"
-              routerLinkActive="bg-amber-600 text-white font-medium"
-              class="px-2.5 py-1.5 rounded-lg text-amber-300 hover:text-white transition flex items-center gap-1.5"
+
+            <!-- Solo visible / destacado para Supervisor -->
+            @if (auth.isSupervisor()) {
+              <a
+                routerLink="/users"
+                routerLinkActive="bg-purple-600 text-white font-medium"
+                class="px-2.5 py-1.5 rounded-lg text-purple-300 hover:text-white transition flex items-center gap-1.5"
+              >
+                <span>Usuarios</span>
+              </a>
+              <a
+                routerLink="/audit"
+                routerLinkActive="bg-amber-600 text-white font-medium"
+                class="px-2.5 py-1.5 rounded-lg text-amber-300 hover:text-white transition flex items-center gap-1.5"
+              >
+                <span>Auditoría</span>
+              </a>
+            }
+          </nav>
+
+          <!-- Role Switcher -->
+          <button
+            (click)="auth.toggleRole()"
+            class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all border"
+            [class]="auth.isSupervisor() ? 'bg-purple-950/60 border-purple-800 text-purple-200' : 'bg-slate-900 border-slate-800 text-slate-300'"
+            title="Alternar entre rol Miembro y Supervisor para pruebas"
+          >
+            <app-icon [name]="auth.isSupervisor() ? 'shield-audit' : 'users-group'" customClass="w-3.5 h-3.5"></app-icon>
+            <span class="hidden sm:inline">{{ auth.isSupervisor() ? 'Supervisor' : 'Miembro' }}</span>
+            <span class="text-[10px] opacity-60">⇄</span>
+          </button>
+
+          <!-- Avatar & Logout -->
+          <div class="flex items-center gap-1.5 pl-1 border-l border-slate-800">
+            <div
+              class="w-8 h-8 rounded-full bg-slate-800 border border-nora-border-dark flex items-center justify-center font-bold text-xs text-nora-primary"
+              [title]="auth.currentUser()?.displayName"
             >
-              <span>Auditoría</span>
-            </a>
-          }
-        </nav>
+              {{ auth.currentUser()?.displayName?.substring(0, 1) || 'U' }}
+            </div>
 
-        <!-- Role Switcher -->
-        <button
-          (click)="auth.toggleRole()"
-          class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all border"
-          [class]="auth.isSupervisor() ? 'bg-purple-950/60 border-purple-800 text-purple-200' : 'bg-slate-900 border-slate-800 text-slate-300'"
-          title="Alternar entre rol Miembro y Supervisor para pruebas"
-        >
-          <app-icon [name]="auth.isSupervisor() ? 'shield-audit' : 'users-group'" customClass="w-3.5 h-3.5"></app-icon>
-          <span class="hidden sm:inline">{{ auth.isSupervisor() ? 'Supervisor' : 'Miembro' }}</span>
-          <span class="text-[10px] opacity-60">⇄</span>
-        </button>
-
-        <!-- Avatar Indicator -->
-        <div class="w-8 h-8 rounded-full bg-slate-800 border border-nora-border-dark flex items-center justify-center font-bold text-xs text-nora-primary">
-          {{ auth.currentUser()?.displayName?.substring(0, 1) || 'U' }}
+            <button
+              (click)="auth.logout()"
+              class="p-2 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-lg transition"
+              title="Cerrar sesión"
+            >
+              <app-icon name="trash-delete" customClass="w-3.5 h-3.5"></app-icon>
+            </button>
+          </div>
         </div>
       </div>
-    </div>
-  </header>
+    </header>
+  }
 
   <!-- Contenido Principal -->
   <main class="flex-1 max-w-4xl w-full mx-auto p-4 sm:p-6 flex flex-col gap-5">
     <!-- Banner de Offline PWA -->
-    @if (!taskStore.isOnline()) {
+    @if (!taskStore.isOnline() && auth.isAuthenticated()) {
       <div class="p-3 bg-amber-500/15 border border-amber-500/30 rounded-xl flex items-center justify-between text-xs text-amber-300">
         <div class="flex items-center gap-2">
           <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
@@ -76,10 +91,12 @@
       </div>
     }
 
-    <!-- Router Outlet para Vistas (Agenda / Usuarios / Auditoría) -->
+    <!-- Router Outlet para Vistas (Login / Agenda / Usuarios / Auditoría) -->
     <router-outlet></router-outlet>
   </main>
 
-  <!-- Asistente de IA Nora (Gemini) flotante -->
-  <app-assistant-chat></app-assistant-chat>
+  <!-- Asistente de IA Nora (Gemini) flotante (Solo si autenticado) -->
+  @if (auth.isAuthenticated()) {
+    <app-assistant-chat></app-assistant-chat>
+  }
 </div>
