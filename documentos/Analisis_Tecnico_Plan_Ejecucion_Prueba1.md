@@ -501,17 +501,17 @@ create table public.chat_messages (
 );
 create index ix_chat_user_created on public.chat_messages (user_id, created_at desc);
 
--- AUDIT LOGS (Histórico transaccional desacoplado: poblado vía auditMiddleware en Edge Functions; CERO triggers en BD)
+-- AUDIT LOGS (Histórico transaccional optimizado: INET nativo de 7-19 bytes; poblado vía auditMiddleware en Deno; CERO triggers en BD)
 create table public.audit_logs (
   id          uuid primary key default gen_random_uuid(),
   user_id     uuid references public.profiles(id) on delete cascade,
-  table_name  text not null,
+  table_name  varchar(63) not null,
   record_id   uuid,
   action      smallint not null check (action in (1,2,3,4)), -- 1=INSERT, 2=UPDATE, 3=DELETE, 4=SELECT
   old_data    jsonb,
   new_data    jsonb,
-  ip_address  text,
-  user_agent  text,
+  ip_address  inet,              -- Optimización: 7 bytes (IPv4) o 19 bytes (IPv6) con validación binaria
+  user_agent  varchar(500),      -- Acotado a 500 chars para evitar sobrecarga y almacenamiento TOAST
   created_at  timestamptz not null default now()
 );
 create index ix_audit_logs_user_table on public.audit_logs (user_id, table_name, created_at desc);

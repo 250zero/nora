@@ -1,16 +1,17 @@
 -- ==============================================================================
--- Migración 0001_init.sql — Esquema Base Nora
--- 5FN, RLS estricto, Enums smallint y auditoría en capa de aplicación (0 triggers)
+-- Migración 0001_init.sql — Esquema Base Nora (Optimizado para Cero Sobrecarga)
+-- 5FN, RLS estricto, Enums smallint, ip_address tipo inet (7-19 bytes)
+-- y auditoría desacoplada en capa de aplicación (0 triggers DML)
 -- ==============================================================================
 
 create extension if not exists pg_trgm;
 
--- 1. PROFILES (Vinculado a auth.users con cascada estricta)
+-- 1. PROFILES (Vinculado a auth.users con cascada estricta y tipos optimizados)
 create table if not exists public.profiles (
   id            uuid primary key references auth.users(id) on delete cascade,
-  display_name  text not null check (char_length(display_name) between 1 and 80),
-  email         text,
-  timezone      text not null default 'America/Santo_Domingo',
+  display_name  varchar(80) not null check (char_length(display_name) >= 1),
+  email         varchar(255),
+  timezone      varchar(50) not null default 'America/Santo_Domingo',
   created_at    timestamptz not null default now()
 );
 
@@ -19,13 +20,13 @@ create table if not exists public.tasks (
   id               uuid primary key default gen_random_uuid(),
   owner_id         uuid not null references public.profiles(id) on delete cascade,
   assignee_id      uuid references public.profiles(id) on delete cascade,
-  title            text not null check (char_length(btrim(title)) between 1 and 200),
+  title            varchar(200) not null check (char_length(btrim(title)) >= 1),
   description      text check (char_length(description) <= 2000),
   due_date         date,
   due_time         time,
   priority         smallint not null default 2 check (priority in (1,2,3)), -- 1=baja, 2=media, 3=alta
   status           smallint not null default 1 check (status in (1,2,3)),   -- 1=pendiente, 2=en_progreso, 3=hecha
-  responsible_name text check (char_length(responsible_name) <= 80),
+  responsible_name varchar(80),
   source           smallint not null default 1 check (source in (1,2)),     -- 1=manual, 2=asistente_ia
   completed_at     timestamptz,
   created_at       timestamptz not null default now(),
@@ -51,7 +52,7 @@ create index if not exists ix_chat_user_created on public.chat_messages (user_id
 -- 4. AGENT_PENDING_ACTIONS (Acciones destructivas pendientes de confirmación)
 create table if not exists public.agent_pending_actions (
   id           uuid primary key default gen_random_uuid(),
-  user_id      uuid not null references public.profiles(id) on delete cascade,
+  user_id      uuid not null default auth.uid() references public.profiles(id) on delete cascade,
   task_id      uuid not null references public.tasks(id) on delete cascade,
   action_type  smallint not null check (action_type in (1,2)), -- 1=eliminar_tarea, 2=eliminar_usuario
   status       smallint not null default 1 check (status in (1,2,3,4)), -- 1=pendiente, 2=confirmada, 3=cancelada, 4=expirada
@@ -61,17 +62,17 @@ create table if not exists public.agent_pending_actions (
 
 create index if not exists ix_pending_user_status on public.agent_pending_actions (user_id, status);
 
--- 5. AUDIT_LOGS (Auditoría transaccional desacoplada: poblada vía auditMiddleware en Deno)
+-- 5. AUDIT_LOGS (Auditoría transaccional optimizada: INET nativo de 7-19 bytes en vez de TEXT)
 create table if not exists public.audit_logs (
   id          uuid primary key default gen_random_uuid(),
   user_id     uuid references public.profiles(id) on delete cascade,
-  table_name  text not null,
+  table_name  varchar(63) not null,
   record_id   uuid,
   action      smallint not null check (action in (1,2,3,4)), -- 1=INSERT, 2=UPDATE, 3=DELETE, 4=SELECT
   old_data    jsonb,
   new_data    jsonb,
-  ip_address  text,
-  user_agent  text,
+  ip_address  inet,              -- Optimización: 7 bytes (IPv4) o 19 bytes (IPv6) con validación binaria
+  user_agent  varchar(500),      -- Acotado a 500 chars para evitar desbordes y TOAST
   created_at  timestamptz not null default now()
 );
 

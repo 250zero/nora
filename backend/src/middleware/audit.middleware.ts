@@ -7,13 +7,22 @@ export const auditMiddleware = (): MiddlewareHandler => {
     const method = c.req.method;
     const path = c.req.path;
 
-    // Capturar metadatos reales de red y cliente
-    const ipAddress =
+    // Capturar y sanitizar IP para tipo inet nativo de PostgreSQL (7 o 19 bytes)
+    const rawIp =
       c.req.header("x-forwarded-for")?.split(",")[0].trim() ||
       c.req.header("cf-connecting-ip") ||
       c.req.header("x-real-ip") ||
       "127.0.0.1";
-    const userAgent = c.req.header("user-agent") || "Unknown";
+    
+    // Si la IP viene con puerto (ej: "192.168.1.1:54321"), extraer solo la IP para inet
+    const cleanIp =
+      rawIp.includes(":") && !rawIp.includes("[") && rawIp.indexOf(":") === rawIp.lastIndexOf(":")
+        ? rawIp.split(":")[0]
+        : rawIp;
+
+    // Limitar User-Agent a 500 caracteres para evitar sobrecarga o TOAST
+    const rawUa = c.req.header("user-agent") || "Unknown";
+    const userAgent = rawUa.length > 500 ? rawUa.substring(0, 500) : rawUa;
 
     // Clonar body para auditoría en peticiones de mutación
     let reqBody: unknown = null;
@@ -43,10 +52,10 @@ export const auditMiddleware = (): MiddlewareHandler => {
       const user = c.get("user") as { id: string } | undefined;
       const durationMs = Date.now() - startTime;
 
-      // Inserción asíncrona en audit_logs sin bloquear la respuesta
+      // Inserción asíncrona en audit_logs sin bloquear la respuesta del usuario
       (async () => {
         try {
-          const tableName = path.split("/")[2] || "api";
+          const tableName = (path.split("/")[2] || "api").substring(0, 63);
           await supabase.from("audit_logs").insert({
             user_id: user?.id || null,
             table_name: tableName,
@@ -55,7 +64,7 @@ export const auditMiddleware = (): MiddlewareHandler => {
             new_data: reqBody
               ? { payload: reqBody, status: c.res.status, duration_ms: durationMs }
               : { status: c.res.status, duration_ms: durationMs },
-            ip_address: ipAddress,
+            ip_address: cleanIp,
             user_agent: userAgent,
           });
         } catch (err) {
