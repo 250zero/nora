@@ -59,6 +59,12 @@ chatRouter.post("/confirm-action", async (c: Context) => {
 
     if (action === "confirm_delete" && taskId) {
       const result = await executeTool("eliminar_tarea", { task_id: taskId }, userId);
+      if (result.result && !result.result.success) {
+        return c.json({
+          error: result.result.error || "No tienes permiso para eliminar esta tarea.",
+          result,
+        }, 403);
+      }
       return c.json({
         message: "Tarea eliminada exitosamente tras tu confirmación.",
         result,

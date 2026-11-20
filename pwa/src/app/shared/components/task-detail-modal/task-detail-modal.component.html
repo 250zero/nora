@@ -130,16 +130,31 @@
       </div>
 
       <!-- Footer con Acciones -->
-      <div class="p-4 border-t border-nora-border-dark flex items-center justify-between bg-nora-surface-elevatedDark/40">
-        <button
-          type="button"
-          (click)="toggleStatus()"
-          class="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-all"
-          [class]="detail.task.status === 3 ? 'bg-amber-950/70 border border-amber-800 text-amber-200' : 'bg-emerald-950/70 border border-emerald-800 text-emerald-200'"
-        >
-          <app-icon name="check-task" customClass="w-3.5 h-3.5" />
-          <span>{{ detail.task.status === 3 ? 'Marcar Pendiente' : 'Marcar Completada' }}</span>
-        </button>
+      <div class="p-4 border-t border-nora-border-dark flex items-center justify-between gap-2 bg-nora-surface-elevatedDark/40">
+        <div class="flex items-center gap-2">
+          <button
+            type="button"
+            (click)="toggleStatus()"
+            class="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-all"
+            [class]="detail.task.status === 3 ? 'bg-amber-950/70 border border-amber-800 text-amber-200' : 'bg-emerald-950/70 border border-emerald-800 text-emerald-200'"
+          >
+            <app-icon name="check-task" customClass="w-3.5 h-3.5" />
+            <span>{{ detail.task.status === 3 ? 'Marcar Pendiente' : 'Marcar Completada' }}</span>
+          </button>
+
+          <!-- Botón Eliminar: Exclusivo para el creador de la tarea -->
+          @if (isOwner()) {
+            <button
+              type="button"
+              (click)="deleteTask()"
+              class="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium text-rose-300 hover:text-rose-100 bg-rose-950/40 hover:bg-rose-900/60 border border-rose-900/60 transition-all"
+              title="Eliminar tarea (solo permitido al creador)"
+            >
+              <app-icon name="trash-delete" customClass="w-3.5 h-3.5" />
+              <span class="hidden sm:inline">Eliminar</span>
+            </button>
+          }
+        </div>
 
         <button
           type="button"

@@ -162,6 +162,20 @@ export class TaskStore {
     this.activeTaskDetail.set(null);
   }
 
+  // Eliminar tarea (solo creador)
+  deleteTask(taskId: string): void {
+    this.api.delete<{ success: boolean; message?: string }>(`tasks/${taskId}`).subscribe({
+      next: () => {
+        this.tasks.update((items) => items.filter((t) => t.id !== taskId));
+        this.saveTasksToCache(this.tasks());
+        this.closeTaskDetail();
+      },
+      error: (err) => {
+        alert(err.error?.error || 'No tienes permiso para eliminar esta tarea.');
+      },
+    });
+  }
+
   // Navegación de fechas
   goToToday(): void {
     this.selectedDate.set(new Date());

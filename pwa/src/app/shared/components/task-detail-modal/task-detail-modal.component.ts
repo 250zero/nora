@@ -1,11 +1,13 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  computed,
   inject,
   signal,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { TaskStore } from '../../../core/stores/task.store';
+import { AuthService } from '../../../core/services/auth.service';
 import { AppIconComponent } from '../app-icon/app-icon.component';
 
 @Component({
@@ -17,9 +19,17 @@ import { AppIconComponent } from '../app-icon/app-icon.component';
 })
 export class TaskDetailModalComponent {
   protected readonly store = inject(TaskStore);
+  protected readonly auth = inject(AuthService);
 
   // Toggle reactivo para desplegar la información detallada de auditoría
   readonly showAuditInfo = signal<boolean>(false);
+
+  // Solo el usuario creador tiene permiso para eliminar la tarea
+  readonly isOwner = computed(() => {
+    const detail = this.store.activeTaskDetail();
+    const currentUser = this.auth.currentUser();
+    return !!detail && !!currentUser && detail.task.owner_id === currentUser.id;
+  });
 
   toggleAuditInfo(): void {
     this.showAuditInfo.update((val) => !val);
@@ -28,6 +38,23 @@ export class TaskDetailModalComponent {
   close(): void {
     this.showAuditInfo.set(false);
     this.store.closeTaskDetail();
+  }
+
+  deleteTask(): void {
+    const detail = this.store.activeTaskDetail();
+    if (!detail) return;
+
+    if (!this.isOwner()) {
+      alert('Solo puedes eliminar las tareas que tú mismo has creado.');
+      return;
+    }
+
+    const confirmed = confirm(
+      `¿Estás seguro de que deseas eliminar la tarea "${detail.task.title}"? Esta acción no se puede deshacer.`
+    );
+    if (confirmed) {
+      this.store.deleteTask(detail.task.id);
+    }
   }
 
   toggleStatus(): void {

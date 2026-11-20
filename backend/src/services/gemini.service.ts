@@ -186,6 +186,27 @@ export async function executeTool(
     }
 
     case "eliminar_tarea": {
+      // 1. Obtener la tarea para verificar propiedad
+      const { data: task, error: fetchErr } = await supabase
+        .from("tasks")
+        .select("id, owner_id, title")
+        .eq("id", args.task_id)
+        .single();
+
+      if (fetchErr || !task) {
+        return { result: { success: false, error: "La tarea no existe o ya fue eliminada." } };
+      }
+
+      // 2. Comprobar que el usuario que pide eliminar sea el creador
+      if (task.owner_id !== userId) {
+        return {
+          result: {
+            success: false,
+            error: `Acceso denegado: solo puedes eliminar las tareas que tú mismo has creado. La tarea "${task.title}" pertenece a otro usuario.`,
+          },
+        };
+      }
+
       const { error } = await supabase
         .from("tasks")
         .delete()
@@ -197,7 +218,7 @@ export async function executeTool(
       }
 
       return {
-        result: { success: true, deleted_id: args.task_id, message: "Tarea eliminada exitosamente." },
+        result: { success: true, deleted_id: args.task_id, message: `Tarea "${task.title}" eliminada exitosamente.` },
       };
     }
 

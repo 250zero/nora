@@ -222,15 +222,49 @@ tasksRouter.put("/:id", async (c: Context) => {
   }
 });
 
-// DELETE /api/tasks/:id — Eliminar tarea
+// DELETE /api/tasks/:id — Eliminar tarea (Solo el creador puede eliminar su propia tarea)
 tasksRouter.delete("/:id", async (c: Context) => {
   const taskId = c.req.param("id");
+  const currentUserId = c.req.header("X-User-Id");
 
-  const { error } = await supabase.from("tasks").delete().eq("id", taskId);
-
-  if (error) {
-    return c.json({ error: error.message }, 500);
+  if (!currentUserId) {
+    return c.json({ error: "No se proporcionó la identidad del usuario (X-User-Id requerido)" }, 401);
   }
 
-  return c.json({ success: true, deleted_id: taskId });
+  // 1. Obtener la tarea para verificar propiedad
+  const { data: task, error: fetchError } = await supabase
+    .from("tasks")
+    .select("id, owner_id, title")
+    .eq("id", taskId)
+    .single();
+
+  if (fetchError || !task) {
+    return c.json({ error: "Tarea no encontrada" }, 404);
+  }
+
+  // 2. Verificar que quien intenta eliminar sea exactamente el creador
+  if (task.owner_id !== currentUserId) {
+    return c.json({
+      error: "Acceso denegado: solo puedes eliminar las tareas que tú mismo has creado.",
+      task_owner_id: task.owner_id,
+      request_user_id: currentUserId,
+    }, 403);
+  }
+
+  // 3. Proceder con el borrado
+  const { error: deleteError } = await supabase
+    .from("tasks")
+    .delete()
+    .eq("id", taskId)
+    .eq("owner_id", currentUserId);
+
+  if (deleteError) {
+    return c.json({ error: deleteError.message }, 500);
+  }
+
+  return c.json({
+    success: true,
+    deleted_id: taskId,
+    message: `Tarea "${task.title}" eliminada exitosamente.`,
+  });
 });
