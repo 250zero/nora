@@ -1,18 +1,29 @@
 import { HttpInterceptorFn } from '@angular/common/http';
-import { inject } from '@angular/core';
-import { AuthService } from '../services/auth.service';
+
+const AUTH_TOKEN_KEY = 'nora_auth_token_v1';
+const AUTH_USER_KEY = 'nora_auth_user_v1';
 
 export const jwtAuthInterceptor: HttpInterceptorFn = (req, next) => {
-  const authService = inject(AuthService);
-  const token = authService.token();
-  const currentUser = authService.currentUser();
-  const currentRole = currentUser?.role || 1;
-  const currentUserId = currentUser?.id;
+  let token: string | null = null;
+  let role = '1';
+  let userId: string | null = null;
 
-  let headers = req.headers.set('X-Active-Role', String(currentRole));
+  if (typeof localStorage !== 'undefined') {
+    token = localStorage.getItem(AUTH_TOKEN_KEY);
+    try {
+      const rawUser = localStorage.getItem(AUTH_USER_KEY);
+      if (rawUser) {
+        const u = JSON.parse(rawUser);
+        role = String(u.role || 1);
+        userId = u.id || null;
+      }
+    } catch {}
+  }
 
-  if (currentUserId) {
-    headers = headers.set('X-User-Id', currentUserId);
+  let headers = req.headers.set('X-Active-Role', role);
+
+  if (userId) {
+    headers = headers.set('X-User-Id', userId);
   }
 
   if (token) {
