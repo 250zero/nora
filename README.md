@@ -1,30 +1,64 @@
-# 🌟 Nora — Asistente Inteligente de Agenda y Tareas con IA (Google Gemini)
+# 🌟 Nora — Asistente Inteligente de Agenda y Tareas con IA
 
-Nora es una solución corporativa de gestión de tiempo y tareas de equipo, diseñada para operar sin fricción manual. Cuenta con una Progressive Web App (PWA) de alto rendimiento en **Angular 19**, un Backend autónomo y ultra-rápido en **Deno (Hono)**, base de datos relacional optimizada en **Supabase Cloud**, y un núcleo de inteligencia artificial impulsado por **Google Gemini**.
+> **Nora:** Solución corporativa de gestión de tiempo y tareas de equipo diseñada para operar con interacción natural y automatización conversacional mediante Inteligencia Artificial (Google Gemini), arquitectura PWA Mobile-First en Angular 19, backend autónomo en Deno (Hono) y base de datos relacional en 5FN sobre PostgreSQL con Row Level Security (RLS).
 
----
-
-## 🚀 Enlaces de Producción (Servidor Visar)
-
-- **Frontend PWA:** [https://nora.vis7ar.com](https://nora.vis7ar.com)
-- **API Backend:** [https://api.nora.vis7ar.com](https://api.nora.vis7ar.com)
-- **Endpoint de Salud:** [https://api.nora.vis7ar.com/api/health](https://api.nora.vis7ar.com/api/health)
+[![Producción en Vivo](https://img.shields.io/badge/Producci%C3%B3n-nora.vis7ar.com-059669?style=for-the-badge&logo=googlechrome&logoColor=white)](https://nora.vis7ar.com)
+[![API Health](https://img.shields.io/badge/API%20Health-200%20OK-blue?style=for-the-badge&logo=deno&logoColor=white)](https://api.nora.vis7ar.com/api/health)
+[![Backend Runtime](https://img.shields.io/badge/Backend-Deno%202.x%20%2B%20Hono-black?style=for-the-badge&logo=deno&logoColor=white)](https://deno.com)
+[![Frontend](https://img.shields.io/badge/Frontend-Angular%2019%20PWA-dd0031?style=for-the-badge&logo=angular&logoColor=white)](https://angular.dev)
+[![Database](https://img.shields.io/badge/Database-PostgreSQL%205FN-336791?style=for-the-badge&logo=postgresql&logoColor=white)](https://postgresql.org)
 
 ---
 
-## 👥 Cuentas de Acceso y Evaluación Inmediata
+## 🚀 1. Enlaces y Accesos a Producción
 
-Ingresa en `/login` con correo y contraseña registrados en Supabase Auth (la gestión y creación de nuevas cuentas vive dentro del módulo **Usuarios** para el Supervisor):
+La plataforma Nora está desplegada y activa en el servidor cloud Visar bajo proxy reverso Nginx con certificados SSL Let's Encrypt:
+
+* **Frontend Web & PWA:** [https://nora.vis7ar.com](https://nora.vis7ar.com)
+* **API Backend (Deno BFF):** [https://api.nora.vis7ar.com/api/health](https://api.nora.vis7ar.com/api/health)
+* **Servidor Host:** Droplet Ubuntu Linux en Visar (`159.203.103.8`, puerto interno `3001` gestionado mediante Systemd).
+
+---
+
+## 👥 2. Credenciales y Matriz de Acceso (Usuarios Sembrados)
+
+Puedes ingresar en `/login` utilizando los usuarios de demostración precargados:
 
 | Rol | Usuario | Contraseña | Capacidades y Alcance |
 | :--- | :--- | :--- | :--- |
-| 👑 **Supervisor** | `supervisor@nora.com` | `Nora2026!` | Gestión completa de colaboradores (crear/eliminar en cascada), reasignación/edición de tareas, filtro por miembro y Panel de Auditoría con IP nativa (`inet`). |
-| 👤 **Miembro** | `miembro@nora.com` | `Nora2026!` | Agenda personal Día/Semana/Mes + vistas Hoy/Próximas/Vencidas/Completadas, asistente IA Nora, edición y borrado exclusivo de tareas creadas por él. |
+| 👑 **Supervisor** | `supervisor@nora.com` | `Nora2026!` | Gestión completa de colaboradores (creación y borrado en cascada), reasignación y edición de tareas del equipo, filtro global por colaborador y acceso al **Panel de Auditoría** con IP nativa (`inet`). |
+| 👤 **Miembro** | `miembro@nora.com` | `Nora2026!` | Agenda personal Día/Semana/Mes, vistas rápidas (Hoy/Próximas/Vencidas/Completadas), interacción conversacional con Asistente Nora, edición y borrado exclusivo de tareas creadas por él. |
+
+> *Nota:* La pantalla de login incluye botones de acceso rápido que precargan automáticamente las credenciales con un solo clic.
 
 ---
 
-## 🏛️ Arquitectura del Sistema
+## 🎯 3. Características Principales del Producto
 
+1. **Asistente Inteligente Conversacional (Google Gemini):**
+   - Agendamiento y gestión de tareas mediante lenguaje natural en español caribeño / estándar.
+   - Orquestación mediante 7 herramientas validadas con Zod: `crear_tarea`, `listar_tareas`, `completar_tarea`, `actualizar_tarea`, `reprogramar_tarea`, `consultar_horas_libres` y `eliminar_tarea`.
+   - Detección proactiva de colisiones de horario y sugerencia de franjas libres (`suggestedSlots`).
+2. **Agenda Multifuncional Mobile-First:**
+   - Visualizaciones de calendario en modos **Día**, **Semana** y **Mes**.
+   - Vistas de filtrado rápido: Hoy, Próximas, Vencidas y Completadas.
+   - Pestaña de navegación móvil inferior con acceso directo a Agenda, Tareas, Chat Nora y Ajustes/Usuarios.
+3. **Ficha Estándar de Tareas con Trazabilidad:**
+   - Visualización y edición estructurada: título, descripción, fecha, hora, prioridad (`Baja`, `Media`, `Alta`, `Urgente`), estado y colaborador asignado.
+   - Metadatos de origen: canal de creación (`IA Conversacional` vs `Manual`), IP de registro (`inet`) y agente de usuario (`User-Agent`).
+4. **Administración de Equipo y Auditoría (Supervisor):**
+   - Alta de nuevos colaboradores con sincronización transaccional en `auth.users` y tabla pública `user_roles`.
+   - Borrado integral en cascada con función RPC `admin_delete_user`.
+   - Panel de auditoría con paginación server-side, filtrado por usuario/acción e IPs reales registradas.
+5. **PWA Offline-First:**
+   - Caché local reactivo en `TaskStore` mediante almacenamiento cliente y detección de estado de red en tiempo real.
+   - Manifiesto instalable en pantallas de inicio móviles y de escritorio.
+
+---
+
+## 🏛️ 4. Arquitectura del Sistema y Stack Tecnológico
+
+### Diagrama de Arquitectura de Producción:
 ```
                       ┌───────────────────────────────────────┐
                       │    Navegador / Celular (PWA)          │
@@ -38,241 +72,239 @@ Ingresa en `/login` con correo y contraseña registrados en Supabase Auth (la ge
                       └──────────┬─────────────────┬──────────┘
                                  │                 │
                 Estáticos PWA    │                 │ Proxy /api/*
-                (/var/www/...)   ▼                 ▼ (Puerto 3001)
+               (/var/www/...)    ▼                 ▼ (Puerto 3001)
                       ┌──────────────────┐  ┌─────────────────────────┐
-                      │ Angular 19 PWA   │  │   Deno + Hono Backend   │
-                      │ Standalone + OnPush │ (nora-backend.service)  │
+                      │  Angular 19 PWA  │  │   Deno + Hono Backend   │
+                      │ Standalone+OnPush│  │ (nora-backend.service)  │
                       └──────────────────┘  └──────────────┬──────────┘
                                                            │
                                 ┌──────────────────────────┴──────────────────────────┐
                                 │                                                     │
                                 ▼                                                     ▼
                 ┌───────────────────────────────┐                     ┌───────────────────────────────┐
-                │        Supabase Cloud         │                     │       Google Gemini AI        │
-                │  Postgres 5FN + Supabase Auth │                     │    gemini-3.5-flash-lite      │
-                │   (Conexión Privada Servidor) │                     │ (7 Tools & Anti-Conflictos)   │
+                │     PostgreSQL en 5FN         │                     │  Google Gemini Flash API      │
+                │     (Supabase Cloud)          │                     │  (Tool Calling & Calendario)  │
                 └───────────────────────────────┘                     └───────────────────────────────┘
 ```
 
-### Principios Innegociables Implementados
-1. **0 Exposición de Supabase y Gemini:** El frontend Angular solo se comunica con la API de Deno (`/api/*`). Ni la URL de Supabase, ni la llave anónima, ni la clave de Gemini están expuestas al navegador.
-2. **RLS Estricto Verificado en Postgres:** Las peticiones autenticadas propagan su JWT (`Bearer`) hacia PostgreSQL/PostgREST para hacer cumplir RLS en las 6 tablas (`profiles`, `user_roles`, `tasks`, `chat_messages`, `agent_pending_actions`, `audit_logs`). El rol `anon` no tiene acceso de lectura ni escritura de negocio.
-3. **Auditoría Desacoplada sin Triggers:** Toda consulta `SELECT` y mutación `DML` se intercepta en `auditMiddleware` dentro de Deno, capturando la IP real (almacenada en tipo `inet` de PostgreSQL), `user_id`, `record_id` y `User-Agent` (redacted para secretos), sin penalizar la base de datos con triggers.
-4. **PWA Offline First:** Cache local reactivo en `TaskStore` mediante `localStorage`, detector automático de conectividad y manifiesto PWA (`manifest.webmanifest`).
-5. **Agenda Orquestada por IA sin Doble Reserva:** El asistente Nora detecta colisiones de horario antes de insertar, ofrece horarios libres interactivos (`suggestedSlots`) y soporta 7 herramientas validadas con Zod (`crear_tarea`, `listar_tareas`, `completar_tarea`, `actualizar_tarea`, `reprogramar_tarea`, `consultar_horas_libres`, `eliminar_tarea`).
+### Componentes del Stack:
+* **Frontend:** Angular 19.2 (Standalone Components, Signals, `ChangeDetectionStrategy.OnPush`, Tailwind CSS 3.4, PWA Service Worker).
+* **Backend:** Deno 2.x, Framework Hono 4.6, Zod para contratos tipados de herramientas, cliente REST de Google Gemini.
+* **Base de Datos:** PostgreSQL en 5FN (Supabase Cloud), Row Level Security (RLS) habilitado en todas las tablas, tipos nativos `inet` y `smallint`.
+* **Inteligencia Artificial:** Google Gemini con Tool Calling iterativo y tabla dinámica de contexto de 14 días en zona horaria `America/Santo_Domingo`.
+* **Infraestructura:** Servidor Ubuntu Linux en Visar, Nginx 1.26 con compresión Gzip, Systemd y Certbot SSL.
+
+### Decisiones Arquitectónicas Clave (ADRs):
+1. **ADR-001: Backend en Deno 2.x + Hono (Puerto 3001)**
+   - *Decisión:* Ejecución directa de TypeScript sin transpilación, sandbox estricto de seguridad, arranque en <30 ms y consumo ultrabajo de memoria (~40 MB de RAM).
+2. **ADR-002: Base de Datos 5FN con RLS Endurecido**
+   - *Decisión:* Separación relacional entre `profiles`, `tasks`, `user_roles`, `chat_messages` y `audit_logs`. RLS activado impidiendo lectura de datos ajenos a nivel de base de datos.
+3. **ADR-003: Auditoría Desacoplada sin Triggers Pesados**
+   - *Decisión:* Las operaciones mutantes se interceptan en el middleware de Deno registrando la IP real `inet`, método y parámetros (con ofuscación automática de contraseñas y tokens), evitando sobrecarga relacional.
+4. **ADR-004: Modelo Nora AI-First**
+   - *Decisión:* El agendamiento principal se realiza mediante lenguaje natural a través del asistente, asegurando validación anti-colisiones antes de persistir en PostgreSQL.
 
 ---
 
-## 🛠️ Stack Tecnológico
+## 💻 5. Guía de Configuración y Ejecución en Local (Paso a Paso)
 
-- **Frontend:** Angular 19.2, TypeScript 5, Tailwind CSS 3.4, Signals, `ChangeDetectionStrategy.OnPush`, Catálogo tipado de iconos SVG.
-- **Backend:** Deno 2.x, Framework Hono 4.6, Zod para validación de contratos, Cliente REST nativo de Google Gemini.
-- **Base de Datos:** PostgreSQL en Supabase Cloud, esquema 5FN, tipos optimizados (`inet`, `smallint`), Row Level Security (RLS).
-- **Inteligencia Artificial:** Google Gemini (`gemini-3.5-flash-lite`) con Tool Calling iterativo y tabla de calendario de 14 días en `America/Santo_Domingo`.
-- **Infraestructura:** Servidor Ubuntu Linux en Visar (`159.203.103.8`), Nginx 1.26, Systemd, Certbot (Let's Encrypt SSL).
+Sigue estos pasos para ejecutar la plataforma Nora en tu entorno de desarrollo local.
+
+### Prerrequisitos del Sistema:
+* **Deno:** Versión 2.x instalada ([instalar Deno](https://deno.land)).
+* **Node.js:** Versión 20+ y `npm` ([instalar Node](https://nodejs.org)).
+* **PostgreSQL:** Versión 15+ local o instancia de Supabase Cloud.
+* **Git:** Para clonar el repositorio.
 
 ---
 
-## 🧪 Pruebas Automatizadas (Backend Deno)
+### Paso 1: Clonar el Repositorio
+```bash
+git clone https://github.com/250zero/nora.git
+cd nora
+```
 
-Ejecutar la suite de pruebas unitarias para fechas relativas (`America/Santo_Domingo`, cruce de medianoche 23:55 / 00:05), normalización de horarios 12h/24h y validadores Zod:
+---
+
+### Paso 2: Configuración de Variables de Entorno (`.env`)
+Copia la plantilla de ejemplo `.env.example` para generar tu archivo `.env`:
 
 ```bash
+# En Windows (PowerShell):
+Copy-Item .env.example .env
+
+# En Linux / macOS:
+cp .env.example .env
+```
+
+Edita el archivo `.env` configurando tus credenciales:
+
+| Variable | Descripción | Ejemplo / Valor por Defecto |
+| :--- | :--- | :--- |
+| `PORT` | Puerto de escucha del backend Deno | `3001` |
+| `DATABASE_URL` | Conexión directa a PostgreSQL | `postgresql://postgres:tu_password@localhost:5432/nora_db` |
+| `SUPABASE_URL` | URL de la instancia Supabase | `https://tu-proyecto.supabase.co` |
+| `SUPABASE_ANON_KEY` | Clave anónima pública de Supabase | `tu_supabase_anon_key` |
+| `SUPABASE_SERVICE_ROLE_KEY` | Clave de servicio para gestión de usuarios | `tu_supabase_service_role_key` |
+| `LLM_PROVIDER` | Proveedor del modelo de IA | `gemini` |
+| `LLM_API_KEY` | Clave de Google AI Studio / Gemini | `tu_gemini_api_key` |
+
+---
+
+### Paso 3: Inicialización de la Base de Datos y Semillas (Seeds)
+
+Aplica las migraciones SQL en orden:
+
+```bash
+# 1. Crear base de datos local
+psql -U postgres -c "CREATE DATABASE nora_db;"
+
+# 2. Aplicar migraciones DDL en orden
+psql -U postgres -d nora_db -f supabase/migrations/0001_init.sql
+psql -U postgres -d nora_db -f supabase/migrations/0002_supervisor.sql
+psql -U postgres -d nora_db -f supabase/migrations/0003_auth_users_roles.sql
+psql -U postgres -d nora_db -f supabase/migrations/0004_auto_confirm_email.sql
+psql -U postgres -d nora_db -f supabase/migrations/0005_backend_rls_grants.sql
+psql -U postgres -d nora_db -f supabase/migrations/0006_security_rls_hardening.sql
+
+# 3. Sembrar datos demo (si aplica)
+psql -U postgres -d nora_db -f supabase/seed.sql
+```
+
+*(Si utilizas Supabase Cloud / CLI: ejecuta `npx supabase db push`)*.
+
+---
+
+### Paso 4: Ejecutar el Backend en Deno (BFF)
+
+Abre una terminal y levanta el backend en modo desarrollo:
+
+```bash
+cd backend
+deno task dev
+```
+
+El servidor quedará disponible en el puerto 3001:
+```
+[Nora Backend] Escuchando en http://localhost:3001
+```
+
+Verifica la salud del servicio:
+```bash
+curl http://localhost:3001/api/health
+# Respuesta: {"status":"healthy","service":"nora-backend",...}
+```
+
+---
+
+### Paso 5: Ejecutar el Frontend Angular 19 PWA
+
+En otra terminal, dirígete a `pwa`, instala paquetes e inicia Angular:
+
+```bash
+cd pwa
+npm install
+npm start
+```
+
+El script `npm start` inicia `ng serve --proxy-config proxy.conf.json`, redirigiendo de forma automática todas las solicitudes a `/api/*` hacia `http://localhost:3001`.
+
+Abre tu navegador en:
+👉 **[http://localhost:4200](http://localhost:4200)**
+
+---
+
+### Paso 6: Verificación Integral del Entorno Local
+1. Inicia sesión como **Supervisor** o **Miembro** con un solo clic.
+2. Abre la pestaña **Chat Nora** y escribe: *"Crea una reunión con el equipo técnico mañana a las 10:00 AM para revisar sprint"*.
+3. Observa cómo el asistente procesa el lenguaje natural, valida colisiones y crea la tarea automáticamente en la Agenda.
+
+---
+
+## 🧪 6. Suite de Pruebas Automatizadas
+
+El backend cuenta con pruebas automatizadas que verifican la interpretación de fechas relativas, el cruce de medianoche en la zona horaria oficial y los esquemas Zod de las herramientas de IA:
+
+```bash
+# Ejecutar suite de pruebas en Deno
 deno test --config backend/deno.json --allow-env --allow-read backend/tests/agent_tools.test.ts
 ```
 
----
-
-## 📦 Instrucciones para Desplegar los Servicios
-
-### Prerrequisitos en la Máquina Local
-- Node.js 20+ y npm
-- Deno 2.x
-- Python 3 con librería `paramiko` (`pip install paramiko`)
-- Archivo `.env` configurado en la raíz
+### Cobertura de Pruebas:
+* ✅ **Zona Horaria:** Manejo preciso de fechas relativas en `America/Santo_Domingo`.
+* ✅ **Cruce de Medianoche:** Resolución correcta de transiciones entre las 23:55 y las 00:05.
+* ✅ **Normalización Horaria:** Conversión bidireccional fiable entre formatos 12 horas (AM/PM) y 24 horas.
+* ✅ **Contratos Zod:** Validación estricta de parámetros en todas las herramientas del Asistente Nora.
 
 ---
 
-### Opción 1: Despliegue Automatizado en 1 Solo Paso (Recomendado)
+## 🌐 7. Catálogo de Endpoints de la API Backend
 
-Desde la raíz del proyecto, ejecuta el script de sincronización con Visar:
-
-```bash
-python scripts/deploy_remote.py
-```
-
-O en PowerShell:
-```powershell
-.\scripts\deploy-visar.ps1
-```
-
-Este script ejecuta automáticamente:
-1. Compilación de producción de Angular PWA (`npm run build`).
-2. Sincronización de estáticos en `/var/www/nora.vis7ar.com/dist/nora/browser/`.
-3. Sincronización del código de Deno y `.env` en `/var/www/nora.vis7ar.com/backend/`.
-4. Actualización del servicio systemd `/etc/systemd/system/nora-backend.service`.
-5. Recarga en caliente de Nginx (`nginx -t && systemctl reload nginx`).
-6. Verificación de salud HTTP y HTTPS en vivo.
-
----
-
-### Opción 2: Despliegue Manual Paso a Paso en el Servidor
-
-Si deseas configurar o revisar manualmente el servidor Visar por SSH:
-
-```bash
-ssh root@159.203.103.8
-```
-
-#### 1. Instalar Deno (si es un nuevo servidor)
-```bash
-curl -fsSL https://deno.land/install.sh | sh
-export PATH="/root/.deno/bin:$PATH"
-echo 'export PATH="/root/.deno/bin:$PATH"' >> ~/.bashrc
-```
-
-#### 2. Configurar el Servicio Systemd de Deno
-Crear el archivo `/etc/systemd/system/nora-backend.service`:
-```ini
-[Unit]
-Description=Nora Deno Backend API (Hono)
-After=network.target
-
-[Service]
-Type=simple
-User=root
-WorkingDirectory=/var/www/nora.vis7ar.com/backend
-EnvironmentFile=/var/www/nora.vis7ar.com/backend/.env
-ExecStart=/root/.deno/bin/deno run --allow-net --allow-env --allow-read main.ts
-Restart=always
-RestartSec=3
-Environment=PORT=3001
-Environment=NODE_ENV=production
-
-[Install]
-WantedBy=multi-user.target
-```
-
-Habilitar y arrancar el servicio:
-```bash
-systemctl daemon-reload
-systemctl enable nora-backend
-systemctl restart nora-backend
-```
-
-#### 3. Configurar el Virtual Host en Nginx
-Crear `/etc/nginx/sites-available/nora.vis7ar.com`:
-```nginx
-server {
-    server_name nora.vis7ar.com;
-    root /var/www/nora.vis7ar.com/dist/nora/browser;
-    index index.html;
-
-    gzip on;
-    gzip_types text/plain text/css application/json application/javascript text/xml application/xml image/svg+xml;
-
-    location /api/ {
-        proxy_pass http://127.0.0.1:3001/api/;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_read_timeout 120s;
-    }
-
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
-}
-
-server {
-    server_name api.nora.vis7ar.com;
-
-    location / {
-        proxy_pass http://127.0.0.1:3001/;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_read_timeout 120s;
-    }
-}
-```
-
-Activar el sitio y recargar Nginx:
-```bash
-ln -sf /etc/nginx/sites-available/nora.vis7ar.com /etc/nginx/sites-enabled/
-nginx -t
-systemctl reload nginx
-```
-
-#### 4. Obtener Certificados SSL con Certbot
-```bash
-certbot --nginx -d nora.vis7ar.com -d api.nora.vis7ar.com --non-interactive --agree-tos --register-unsafely-without-email
-```
-
----
-
-## 🔍 Comandos de Operación y Monitoreo en el Servidor
-
-| Acción | Comando |
-| :--- | :--- |
-| **Ver estado del backend** | `systemctl status nora-backend` |
-| **Ver logs en tiempo real** | `journalctl -u nora-backend -f` |
-| **Reiniciar backend** | `systemctl restart nora-backend` |
-| **Verificar sintaxis de Nginx**| `nginx -t` |
-| **Recargar Nginx** | `systemctl reload nginx` |
-| **Comprobar salud local** | `curl -s http://127.0.0.1:3001/api/health` |
-| **Comprobar salud pública**| `curl -s https://api.nora.vis7ar.com/api/health` |
-
----
-
-## 🌐 Endpoints de la API Backend
+Todos los endpoints de negocio operan bajo el prefijo `/api/`:
 
 | Método | Endpoint | Protección | Descripción |
 | :--- | :--- | :---: | :--- |
-| `GET` | `/api/health` | Pública | Estado del servicio y timestamp. |
-| `POST`| `/api/auth/login` | Pública | Login contra Supabase Auth; devuelve JWT y rol. |
-| `POST`| `/api/auth/register` | Pública | Registro de colaborador nuevo en Supabase Auth. |
+| `GET` | `/api/health` | Pública | Estado del servicio, uptime y timestamp. |
+| `POST` | `/api/auth/login` | Pública | Login contra Supabase Auth; retorna JWT y rol asignado. |
+| `POST` | `/api/auth/register` | Pública | Registro de colaborador nuevo en Supabase Auth. |
 | `GET` | `/api/auth/me` | Bearer Token | Obtiene perfil y rol del usuario autenticado. |
-| `POST`| `/api/auth/logout` | Bearer Token | Cierre de sesión. |
-| `GET` | `/api/agenda` | Bearer Token | Agenda formateada para vistas Día/Semana/Mes. |
-| `GET` | `/api/tasks` | Bearer Token | Listado de tareas con filtros (estado, búsqueda, usuario). |
-| `POST`| `/api/tasks` | Bearer Token | Creación de tarea con validación Zod. |
-| `GET` | `/api/tasks/:id/detail` | Bearer Token | Ficha estándar con trazabilidad (creador, canal IA/Manual, IP/User-Agent). |
-| `PUT`| `/api/tasks/:id` | Bearer Token | Edición completa de tarea (título, descripción, fecha, hora, prioridad, asignado). |
-| `PATCH`| `/api/tasks/:id/status` | Bearer Token | Toggle optimista de estado (`1=Pendiente`, `2=En progreso`, `3=Hecha`). |
-| `DELETE`| `/api/tasks/:id` | Bearer Token | Eliminación de tarea (exclusivo creador o supervisor bajo RLS). |
-| `POST`| `/api/users` | Rol Supervisor | Alta de nuevo colaborador en Supabase Auth + perfil y rol. |
-| `GET` | `/api/users` | Rol Supervisor | Lista de colaboradores con estadísticas de tareas. |
-| `GET` | `/api/users/:id/tasks` | Rol Supervisor | Drill-down de tareas de un colaborador. |
-| `DELETE`| `/api/users/:id` | Rol Supervisor | Borrado completo (`admin_delete_user`) en `auth.users` + cascada total. |
-| `GET` | `/api/chat/history` | Bearer Token | Recupera el historial conversacional persistido del usuario. |
-| `POST`| `/api/chat` | Bearer Token | Conversación con Asistente Nora + Google Gemini Tool Calling y persistencia. |
-| `POST`| `/api/chat/confirm-action` | Bearer Token | Confirmación / cancelación de acciones destructivas (`agent_pending_actions`). |
-| `GET` | `/api/audit-logs` | Rol Supervisor | Registro de auditoría con paginación server-side y filtro por acción/usuario. |
+| `POST` | `/api/auth/logout` | Bearer Token | Cierre y revocación de sesión. |
+| `GET` | `/api/agenda` | Bearer Token | Retorna tareas formateadas para vistas de calendario (Día/Semana/Mes). |
+| `GET` | `/api/tasks` | Bearer Token | Listado de tareas con filtros por estado, búsqueda o usuario asignado. |
+| `POST` | `/api/tasks` | Bearer Token | Creación de tarea con validación Zod. |
+| `GET` | `/api/tasks/:id/detail` | Bearer Token | Ficha detallada con trazabilidad completa (canal IA/Manual, IP, agente). |
+| `PUT` | `/api/tasks/:id` | Bearer Token | Edición completa de tarea (título, descripción, fecha, hora, prioridad). |
+| `PATCH` | `/api/tasks/:id/status` | Bearer Token | Actualización optimista de estado (`1=Pendiente`, `2=En progreso`, `3=Hecha`). |
+| `DELETE` | `/api/tasks/:id` | Bearer Token | Eliminación de tarea (restringido al autor o supervisor bajo RLS). |
+| `POST` | `/api/users` | Rol Supervisor | Alta de nuevo colaborador con rol en Supabase Auth. |
+| `GET` | `/api/users` | Rol Supervisor | Listado de colaboradores con métricas de productividad. |
+| `GET` | `/api/users/:id/tasks` | Rol Supervisor | Drill-down de tareas asociadas a un colaborador específico. |
+| `DELETE` | `/api/users/:id` | Rol Supervisor | Eliminación completa en cascada (`admin_delete_user`). |
+| `GET` | `/api/chat/history` | Bearer Token | Recuperación del historial de mensajes del usuario. |
+| `POST` | `/api/chat` | Bearer Token | Conversación con Nora con Tool Calling de Google Gemini. |
+| `POST` | `/api/chat/confirm-action` | Bearer Token | Confirmación o cancelación de acciones destructivas pendientes. |
+| `GET` | `/api/audit-logs` | Rol Supervisor | Bitácora de auditoría con paginación server-side y filtros. |
 
 ---
 
-## 🗄️ Migraciones de Base de Datos Aplicadas
+## 🛠️ 8. Guía de Despliegue en Servidor de Producción (Visar / Linux)
 
-Todas las migraciones fueron aplicadas con éxito en Supabase Cloud:
-1. `0001_init.sql`: Tablas principales 5FN (`profiles`, `tasks`, `audit_logs` con IP `inet`, `chat_messages`, `agent_pending_actions`), índices y triggers de negocio.
-2. `0002_supervisor.sql`: Tabla `user_roles`, función `is_supervisor()`, RLS de roles y guardas `tg_tasks_guard`.
-3. `0003_auth_users_roles.sql`: Trigger `handle_new_user()` sincronizando Supabase Auth y `public.user_roles`.
-4. `0004_auto_confirm_email.sql`: Auto-confirmación inmediata de email en `auth.users` para facilitar evaluación.
-5. `0005_backend_rls_grants.sql`: Grants base temporales durante transición inicial a BFF.
-6. `0006_security_rls_hardening.sql`: **Endurecimiento definitivo**: activa `ENABLE ROW LEVEL SECURITY` en las 6 tablas, revoca acceso de lectura/escritura de negocio a `anon`, limpia usuarios huérfanos en `auth.users`, sanitiza payloads históricos de `audit_logs`, refuerza `handle_new_user()` y añade RPC `admin_delete_user()`.
+### Prerrequisitos en el Servidor:
+* Servidor Ubuntu Linux (`159.203.103.8`) con Nginx, Deno 2.x y certificados SSL activos.
+* Llave SSH autorizada en `~/.ssh/id_ed25519_visar`.
+
+### Despliegue Automatizado en 1 Solo Paso:
+Desde la raíz del proyecto ejecuta en PowerShell:
+```powershell
+.\scripts\deploy-visar.ps1
+```
+*(O en Linux/macOS: `python scripts/deploy_remote.py`)*
+
+El script realiza automáticamente:
+1. Compilación de producción de Angular PWA (`npm run build`).
+2. Sincronización de estáticos en `/var/www/nora.vis7ar.com/dist/nora/browser/`.
+3. Sincronización del backend Deno y `.env` en `/var/www/nora.vis7ar.com/backend/`.
+4. Recarga del servicio systemd `/etc/systemd/system/nora-backend.service`.
+5. Recarga en caliente de Nginx (`nginx -t && systemctl reload nginx`).
+
+### Comandos de Operación y Monitoreo en el Servidor:
+```bash
+# Ver estado del backend
+systemctl status nora-backend
+
+# Logs en tiempo real
+journalctl -u nora-backend -f
+
+# Reiniciar backend
+systemctl restart nora-backend
+
+# Comprobar salud local
+curl -s http://127.0.0.1:3001/api/health
+```
 
 ---
 
-## 🔮 Roadmap de Producto y Futuros Features
+## 🔮 9. Roadmap de Producto y Futuros Features
 
 Para las próximas versiones de la plataforma Nora se proyectan las siguientes extensiones funcionales clave:
 1. **Etiquetas y Proyectos Jerárquicos N:M:** Soporte para categorizar tareas por proyectos, clientes o áreas de negocio con tableros Kanban interactivos y filtros combinados.
@@ -284,7 +316,7 @@ Para las próximas versiones de la plataforma Nora se proyectan las siguientes e
 
 ---
 
-## ⚡ Mejoras Posibles y Optimizaciones de Arquitectura
+## ⚡ 10. Mejoras Posibles y Optimizaciones de Arquitectura
 
 1. **Streaming en Tiempo Real (Server-Sent Events / WebSockets):** Transmisión token a token de las respuestas del asistente Nora en el chat para reducir la percepción de latencia y mejorar la fluidez de interacción.
 2. **Memoria Semántica a Largo Plazo con RAG Vectorial (`pgvector`):** Indexación vectorial del historial de conversaciones, notas corporativas y proyectos pasados para que Nora recuerde contexto extendido y preferencias del usuario.
@@ -294,6 +326,6 @@ Para las próximas versiones de la plataforma Nora se proyectan las siguientes e
 
 ---
 
-## 📄 Licencia y Derechos
+## 📄 11. Licencia y Gobernanza
 
-Proyecto desarrollado conforme a las especificaciones y lineamientos de arquitectura corporativa de Visar, enfocado en productividad empresarial, diseño Mobile-First y automatización con Inteligencia Artificial.
+Proyecto desarrollado bajo estándares empresariales de arquitectura limpia, patrones de alta disponibilidad y mejores prácticas de ingeniería de software para productividad corporativa y automatización con IA conforme a los lineamientos de Visar.
