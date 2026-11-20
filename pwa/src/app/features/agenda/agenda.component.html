@@ -118,7 +118,7 @@
 
       <!-- Grilla del Calendario Mensual -->
       <div class="grid grid-cols-7 auto-rows-fr divide-x divide-y divide-nora-border-dark bg-nora-bg-dark/40">
-        @for (cell of monthCalendarDays(); track cell.dateString) {
+        @for (cell of monthCalendarDays(); track (cell.dateString + '_' + cell.tasks.length)) {
           <div
             class="min-h-[85px] sm:min-h-[105px] p-1 flex flex-col transition-colors hover:bg-slate-800/40"
             [ngClass]="{
@@ -171,7 +171,7 @@
         Vista Semanal (7 Columnas)
       </h3>
       <div class="grid grid-cols-1 sm:grid-cols-7 gap-2">
-        @for (day of weekCalendarDays(); track day.dateString) {
+        @for (day of weekCalendarDays(); track (day.dateString + '_' + day.tasks.length)) {
           <div
             class="bg-slate-900/80 border border-nora-border-dark rounded-xl p-2.5 flex flex-col gap-2 min-h-[140px]"
             [class.border-nora-primary]="day.isToday"

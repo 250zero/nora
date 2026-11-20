@@ -1,8 +1,10 @@
 import { CommonModule } from '@angular/common';
 import {
   ChangeDetectionStrategy,
+  ChangeDetectorRef,
   Component,
   computed,
+  effect,
   inject,
   OnInit,
   signal,
@@ -35,6 +37,20 @@ export class AgendaComponent implements OnInit {
   protected readonly store = inject(TaskStore);
   protected readonly auth = inject(AuthService);
   private readonly api = inject(ApiService);
+  private readonly cdr = inject(ChangeDetectorRef);
+
+  constructor() {
+    effect(() => {
+      // Fuerza el repintado reactivo de la agenda cuando cambien las tareas o filtros
+      this.store.tasks();
+      this.store.filteredTasks();
+      this.store.tasksByDate();
+      this.store.selectedDate();
+      this.store.selectedView();
+      this.store.filterUserId();
+      this.cdr.markForCheck();
+    });
+  }
 
   readonly daysOfWeek = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
   readonly hoursOfDay = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
@@ -53,6 +69,7 @@ export class AgendaComponent implements OnInit {
     this.api.get<{ users: any[] }>('users').subscribe({
       next: (res) => {
         this.teamMembers.set(res.users || []);
+        this.cdr.markForCheck();
       },
       error: () => {},
     });
@@ -66,6 +83,10 @@ export class AgendaComponent implements OnInit {
 
   // Generación de la matriz de días para el modo Mes
   readonly monthCalendarDays = computed<CalendarDay[]>(() => {
+    // Suscripción directa a las señales de tareas para garantizar reactividad inmediata
+    this.store.tasks();
+    const tasksMap = this.store.tasksByDate();
+
     const date = this.store.selectedDate();
     const year = date.getFullYear();
     const month = date.getMonth();
@@ -90,7 +111,7 @@ export class AgendaComponent implements OnInit {
         dayNumber: prevDate.getDate(),
         isCurrentMonth: false,
         isToday: iso === todayStr,
-        tasks: this.store.tasksByDate().get(iso) || [],
+        tasks: tasksMap.get(iso) || [],
       });
     }
 
@@ -104,7 +125,7 @@ export class AgendaComponent implements OnInit {
         dayNumber: i,
         isCurrentMonth: true,
         isToday: iso === todayStr,
-        tasks: this.store.tasksByDate().get(iso) || [],
+        tasks: tasksMap.get(iso) || [],
       });
     }
 
@@ -119,7 +140,7 @@ export class AgendaComponent implements OnInit {
         dayNumber: i,
         isCurrentMonth: false,
         isToday: iso === todayStr,
-        tasks: this.store.tasksByDate().get(iso) || [],
+        tasks: tasksMap.get(iso) || [],
       });
     }
 
@@ -128,6 +149,9 @@ export class AgendaComponent implements OnInit {
 
   // Días para el modo Semana
   readonly weekCalendarDays = computed<CalendarDay[]>(() => {
+    this.store.tasks();
+    const tasksMap = this.store.tasksByDate();
+
     const date = this.store.selectedDate();
     const currentDay = date.getDay();
     const startOfWeek = new Date(date);
@@ -146,7 +170,7 @@ export class AgendaComponent implements OnInit {
         dayNumber: d.getDate(),
         isCurrentMonth: d.getMonth() === date.getMonth(),
         isToday: iso === todayStr,
-        tasks: this.store.tasksByDate().get(iso) || [],
+        tasks: tasksMap.get(iso) || [],
       });
     }
     return days;
@@ -154,6 +178,7 @@ export class AgendaComponent implements OnInit {
 
   // Tareas para el modo Día
   readonly dayTasks = computed<Task[]>(() => {
+    this.store.tasks();
     const iso = this.formatIsoDate(this.store.selectedDate());
     return this.store.tasksByDate().get(iso) || [];
   });

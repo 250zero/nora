@@ -111,13 +111,21 @@ export class AssistantChatComponent {
           this.isSending.set(false);
           this.scrollToBottom();
 
-          // Si se creó, reprogramó o eliminó una tarea, refrescar la agenda del usuario inmediatamente
-          if (
-            res.toolExecuted &&
-            (res.toolExecuted.includes('crear_tarea') ||
-              res.toolExecuted.includes('reprogramar_tarea') ||
-              res.toolExecuted.includes('eliminar_tarea'))
-          ) {
+          // Refrescar inmediatamente la agenda del usuario y limpiar filtros para pintar las tareas creadas/modificadas
+          const replyLower = (res.reply || '').toLowerCase();
+          const toolExec = res.toolExecuted || '';
+          const hasTaskAction =
+            toolExec.includes('crear_tarea') ||
+            toolExec.includes('reprogramar_tarea') ||
+            toolExec.includes('eliminar_tarea') ||
+            replyLower.includes('agendad') ||
+            replyLower.includes('registrad') ||
+            replyLower.includes('reprogramad') ||
+            replyLower.includes('eliminad');
+
+          if (hasTaskAction) {
+            this.taskStore.refreshAndClearFilter();
+          } else if (res.toolExecuted) {
             this.taskStore.loadTasks();
           }
         },

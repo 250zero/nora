@@ -75,7 +75,7 @@ export class TaskStore {
   readonly tasksByDate = computed(() => {
     const map = new Map<string, Task[]>();
     for (const t of this.filteredTasks()) {
-      const key = t.due_date || 'sin_fecha';
+      const key = t.due_date ? t.due_date.substring(0, 10) : 'sin_fecha';
       const current = map.get(key) || [];
       current.push(t);
       map.set(key, current);
@@ -86,7 +86,7 @@ export class TaskStore {
   // Tareas de Hoy
   readonly todayTasks = computed(() => {
     const todayStr = this.formatDateIso(new Date());
-    return this.filteredTasks().filter((t) => t.due_date === todayStr);
+    return this.filteredTasks().filter((t) => (t.due_date ? t.due_date.substring(0, 10) : '') === todayStr);
   });
 
   // Métodos de carga
@@ -108,7 +108,7 @@ export class TaskStore {
       .get<{ tasks: Task[] }>('tasks', params)
       .subscribe({
         next: (res) => {
-          const list = res.tasks || [];
+          const list = [...(res.tasks || [])];
           this.tasks.set(list);
           this.saveTasksToCache(list);
           this.isLoading.set(false);
@@ -122,6 +122,14 @@ export class TaskStore {
           this.isLoading.set(false);
         },
       });
+  }
+
+  // Refresca la lista de tareas restableciendo cualquier filtro de usuario para asegurar que las nuevas tareas se pinten de inmediato
+  refreshAndClearFilter(): void {
+    if (this.filterUserId()) {
+      this.filterUserId.set(null);
+    }
+    this.loadTasks();
   }
 
   // Toggle optimista de estado completada
