@@ -111,10 +111,12 @@ export class AssistantChatComponent {
           this.isSending.set(false);
           this.scrollToBottom();
 
-          // Si se creó o eliminó una tarea, refrescar la agenda del usuario inmediatamente
+          // Si se creó, reprogramó o eliminó una tarea, refrescar la agenda del usuario inmediatamente
           if (
             res.toolExecuted &&
-            (res.toolExecuted.includes('crear_tarea') || res.toolExecuted.includes('eliminar_tarea'))
+            (res.toolExecuted.includes('crear_tarea') ||
+              res.toolExecuted.includes('reprogramar_tarea') ||
+              res.toolExecuted.includes('eliminar_tarea'))
           ) {
             this.taskStore.loadTasks();
           }
