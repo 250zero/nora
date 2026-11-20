@@ -272,17 +272,28 @@ Todas las migraciones fueron aplicadas con éxito en Supabase Cloud:
 
 ---
 
-## 📋 Decisiones de Diseño y Alcance Fuera del MVP
+## 🔮 Roadmap de Producto y Futuros Features
 
-Por decisión arquitectónica del producto (**Nora AI-First**) y priorización del MVP:
-- **Creación centrada en IA (sin botón manual `+` en Agenda):** Las tareas se agendan conversacionalmente mediante el Asistente Nora (`RF-12`/`RF-UI-CAL`), reservando la edición y borrado estructurados en la Ficha Estándar (`TaskDetailModalComponent`) y el módulo de Usuarios.
-- **Fuera de alcance actual (Backlog Deseables):**
-  - `RF-11`: Etiquetas / proyectos N:M adicionales.
-  - `RF-21`: Dictado por voz con Web Speech API.
-  - `RF-26`: Notificaciones Push Web / VAPID en segundo plano.
+Para las próximas versiones de la plataforma Nora se proyectan las siguientes extensiones funcionales clave:
+1. **Etiquetas y Proyectos Jerárquicos N:M:** Soporte para categorizar tareas por proyectos, clientes o áreas de negocio con tableros Kanban interactivos y filtros combinados.
+2. **Interacción y Dictado por Voz (Web Speech API & Whisper):** Agendamiento y consultas por voz con reconocimiento en lenguaje natural y síntesis de audio de las respuestas de Nora en tiempo real.
+3. **Notificaciones Push Proactivas (Web Push VAPID / WhatsApp / Telegram):** Envío automático de recordatorios antes del inicio de reuniones o vencimiento de tareas críticas, así como avisos de reasignación.
+4. **Sincronización Bidireccional de Calendarios (Google Calendar, Outlook, Apple Calendar):** Integración nativa vía protocolos CalDAV y APIs de Google/Microsoft con sincronización de eventos en dos direcciones.
+5. **Briefing Ejecutivo Matutino con IA:** Generación automatizada de un resumen ejecutivo diario al iniciar la jornada (vía email o mensaje interactivo en la app) con las prioridades, horas pico y recomendaciones de enfoque.
+6. **Agendamiento Grupal Inteligente:** Detección automática de disponibilidad cruzada entre múltiples colaboradores para sugerir la franja horaria óptima sin colisiones de agenda.
+
+---
+
+## ⚡ Mejoras Posibles y Optimizaciones de Arquitectura
+
+1. **Streaming en Tiempo Real (Server-Sent Events / WebSockets):** Transmisión token a token de las respuestas del asistente Nora en el chat para reducir la percepción de latencia y mejorar la fluidez de interacción.
+2. **Memoria Semántica a Largo Plazo con RAG Vectorial (`pgvector`):** Indexación vectorial del historial de conversaciones, notas corporativas y proyectos pasados para que Nora recuerde contexto extendido y preferencias del usuario.
+3. **Caché en Memoria y Rate Limiting Adaptativo (Redis / Upstash):** Protección de cuotas de la API de Google Gemini, aceleración de consultas recurrentes de agenda y limitación inteligente de peticiones por usuario.
+4. **Soporte de Modelos LLM Locales / On-Premise (Ollama / vLLM):** Capacidad de alternar entre Gemini en la nube y modelos locales (Llama 3 / Mistral) para entornos con normativas estrictas de soberanía de datos.
+5. **Pruebas E2E Automatizadas con Playwright:** Suite integral de pruebas end-to-end simulando la navegación de usuarios, flujos conversacionales y verificación de accesibilidad WCAG 2.1 AA.
 
 ---
 
 ## 📄 Licencia y Derechos
 
-Proyecto desarrollado conforme a las especificaciones y lineamientos de arquitectura corporativa de Visar.
+Proyecto desarrollado conforme a las especificaciones y lineamientos de arquitectura corporativa de Visar, enfocado en productividad empresarial, diseño Mobile-First y automatización con Inteligencia Artificial.
