@@ -1,7 +1,7 @@
 import { ENV } from "../config/env.ts";
 import { supabase } from "../config/supabase.ts";
 
-const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent";
+const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent";
 
 // Declaración de Tools para el payload REST de Gemini
 const toolsDeclaration = [
@@ -231,21 +231,24 @@ export async function chatWithNora(
   const currentIsoDate = now.toISOString().split("T")[0];
 
   const systemPrompt = `
-Eres Nora, una asistente ejecutiva inteligente, empática y de alta precisión especializada en la gestión de agenda personal y de equipo.
+Eres Nora, una asistente ejecutiva inteligente, empática y de alta precisión especializada en la gestión ágil de agenda y tareas.
 Zona horaria del sistema: America/Santo_Domingo (UTC-4, hora local de República Dominicana).
 Fecha y hora actual: ${currentDateStr} (ISO: ${currentIsoDate}).
 
 REGLAS ESTRICTAS DE COMPORTAMIENTO:
-1. GESTIÓN DE HORAS LIBRES:
-   - Cuando el usuario solicite agendar una reunión, cita o tarea pero NO especifique una hora exacta (por ejemplo: "agenda una reunión con el cliente para mañana" o "pon una cita el viernes"), NUNCA asumas una hora inventada.
-   - Debes llamar inmediatamente a la herramienta "consultar_horas_libres" pasando la fecha respectiva.
-   - Al recibir los horarios libres, indícaselos al usuario en tu respuesta de manera muy clara para que elija uno.
-2. CREACIÓN CON HORA EXACTA:
-   - Si el usuario indica o confirma una hora exacta (por ejemplo: "el jueves a las 10:00 AM"), llama directamente a "crear_tarea" con los datos correspondientes.
+1. CREACIÓN DE TAREAS Y RECORDATORIOS:
+   - Cuando el usuario solicite crear, agendar o agregar tareas (por ejemplo: "crea una tarea de cumpleaños para el viernes", "anota ir al supermercado", "recuérdame visitar a Juana el sábado"), DEBES LLAMAR DIRECTAMENTE a la herramienta "crear_tarea" para CADA tarea que el usuario mencione.
+   - Si el usuario no especifica una hora exacta para una tarea (ej. "el viernes"), puedes dejar due_time vacío (null) o poner una hora tentativa habitual (ej. "09:00", "10:00" o "15:00"), pero SIEMPRE debes ejecutar "crear_tarea" inmediatamente sin detenerte a preguntar.
+   - Si el usuario pide crear múltiples tareas en un solo mensaje, emite una llamada a "crear_tarea" para CADA UNA de ellas en la misma respuesta.
+
+2. GESTIÓN DE HORAS LIBRES / REUNIONES:
+   - Solo debes llamar a "consultar_horas_libres" cuando el usuario pregunte explícitamente por su disponibilidad o cuándo tiene tiempo para una reunión o cita (por ejemplo: "¿qué horas tengo libres el viernes?", "¿a qué hora puedo reunirme con el cliente mañana?").
+
 3. ELIMINACIÓN SEGURA:
    - Si el usuario pide borrar una tarea sin especificar confirmación, antes de borrarla pregunta: "¿Estás seguro de que deseas eliminar la tarea [Nombre]?" indicando que la acción es definitiva.
-4. TONO:
-   - Profesional, conciso, cálido y enfocado en la productividad.
+
+4. TONO Y FORMATO:
+   - Profesional, conciso, cálido y enfocado en la productividad. Confirma siempre las tareas creadas con su título y fecha correspondiente.
 `;
 
   // Construir historial de mensajes en formato Gemini
@@ -270,7 +273,7 @@ REGLAS ESTRICTAS DE COMPORTAMIENTO:
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 90000); // 90s timeout para razonamiento completo
+    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout
 
     const resp = await fetch(`${GEMINI_API_URL}?key=${ENV.LLM_API_KEY}`, {
       method: "POST",
@@ -290,14 +293,18 @@ REGLAS ESTRICTAS DE COMPORTAMIENTO:
     const parts = candidate?.content?.parts || [];
 
     let replyText = "";
-    let functionCall: any = null;
+    const functionCalls: Array<{ name: string; args: any; id?: string }> = [];
 
     for (const part of parts) {
       if (part.text) {
         replyText += part.text;
       }
       if (part.functionCall) {
-        functionCall = part.functionCall;
+        functionCalls.push({
+          name: part.functionCall.name,
+          args: part.functionCall.args || {},
+          id: part.functionCall.id || (part as any).id,
+        });
       }
     }
 
@@ -305,17 +312,17 @@ REGLAS ESTRICTAS DE COMPORTAMIENTO:
     let actionRequired: any = undefined;
     let toolExecuted: string | undefined;
 
-    if (functionCall) {
-      const toolName = functionCall.name;
-      const toolArgs = functionCall.args || {};
-      toolExecuted = toolName;
+    if (functionCalls.length > 0) {
+      // Si alguna llamada es eliminar y no fue confirmada
+      const deleteCall = functionCalls.find(
+        (fc) => fc.name === "eliminar_tarea" && !userMessage.toLowerCase().includes("confirmo")
+      );
 
-      // Si es eliminar y no fue confirmado
-      if (toolName === "eliminar_tarea" && !userMessage.toLowerCase().includes("confirmo")) {
+      if (deleteCall) {
         actionRequired = {
           type: "confirm_delete",
-          taskId: toolArgs.task_id,
-          taskTitle: toolArgs.task_title || "esta tarea",
+          taskId: deleteCall.args.task_id,
+          taskTitle: deleteCall.args.task_title || "esta tarea",
         };
         return {
           reply: `¿Estás seguro de que deseas eliminar la tarea "${actionRequired.taskTitle}"? Esta acción es definitiva e irreversible.`,
@@ -324,12 +331,40 @@ REGLAS ESTRICTAS DE COMPORTAMIENTO:
         };
       }
 
-      // Ejecutar tool
-      const toolOutput = await executeTool(toolName, toolArgs, userId);
-      suggestedSlots = toolOutput.suggestedSlots;
-      actionRequired = toolOutput.actionRequired;
+      // Ejecutar TODAS las tools llamadas por el modelo (soporte para creación múltiple/batch)
+      const functionResponseParts: any[] = [];
+      const executedNames: string[] = [];
+      const createdTasksList: string[] = [];
 
-      // Enviar resultado de la tool para respuesta natural final
+      for (const fc of functionCalls) {
+        executedNames.push(fc.name);
+        const toolOutput = await executeTool(fc.name, fc.args, userId);
+        if (toolOutput.suggestedSlots) {
+          suggestedSlots = toolOutput.suggestedSlots;
+        }
+        if (toolOutput.actionRequired) {
+          actionRequired = toolOutput.actionRequired;
+        }
+
+        if (fc.name === "crear_tarea" && toolOutput.result?.task) {
+          createdTasksList.push(
+            `• **${fc.args.title}** para el ${fc.args.due_date}${fc.args.due_time ? ' a las ' + fc.args.due_time : ''}`
+          );
+        }
+
+        const fr: any = {
+          name: fc.name,
+          response: toolOutput.result,
+        };
+        if (fc.id) {
+          fr.id = fc.id;
+        }
+        functionResponseParts.push({ functionResponse: fr });
+      }
+
+      toolExecuted = executedNames.join(", ");
+
+      // Enviar resultado acumulado de las tools a Gemini para respuesta conversacional
       const followUpPayload = {
         systemInstruction: {
           parts: [{ text: systemPrompt }],
@@ -339,16 +374,10 @@ REGLAS ESTRICTAS DE COMPORTAMIENTO:
           candidate.content,
           {
             role: "user",
-            parts: [
-              {
-                functionResponse: {
-                  name: toolName,
-                  response: toolOutput.result,
-                },
-              },
-            ],
+            parts: functionResponseParts,
           },
         ],
+        tools: toolsDeclaration,
       };
 
       const followUpResp = await fetch(`${GEMINI_API_URL}?key=${ENV.LLM_API_KEY}`, {
@@ -362,11 +391,11 @@ REGLAS ESTRICTAS DE COMPORTAMIENTO:
         const followParts = followUpData.candidates?.[0]?.content?.parts || [];
         replyText = followParts.map((p: any) => p.text || "").join("");
       } else {
-        if (toolName === "consultar_horas_libres") {
-          replyText = `He consultado tu agenda para el ${toolArgs.fecha}. Dispones de los siguientes horarios libres para agendar:\n` +
-            (suggestedSlots?.map((s) => `• ${s}`).join("\n") || "Sin horarios disponibles");
-        } else if (toolName === "crear_tarea") {
-          replyText = `¡Listo! He registrado la tarea "${toolArgs.title}" en tu agenda para el ${toolArgs.due_date} ${toolArgs.due_time ? 'a las ' + toolArgs.due_time : ''}.`;
+        if (createdTasksList.length > 0) {
+          replyText = `¡Listo! He registrado las siguientes tareas en tu agenda:\n\n${createdTasksList.join("\n")}`;
+        } else if (suggestedSlots && suggestedSlots.length > 0) {
+          replyText = `He consultado tu agenda. Dispones de los siguientes horarios libres:\n` +
+            suggestedSlots.map((s) => `• ${s}`).join("\n");
         }
       }
 
