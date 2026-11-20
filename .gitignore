@@ -12,6 +12,9 @@
 *.key
 *.cert
 *.pfx
+scripts/*.py
+*.py
+*.log
 
 # 2. Angular / Node Frontend
 node_modules/
