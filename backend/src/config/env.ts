@@ -1,13 +1,18 @@
 import { load } from "@std/dotenv";
 
-// Cargar variables de .env buscando en rutas relativas comunes
-const envPaths = ["../.env", "../../.env", "./.env"];
+// Cargar variables de .env buscando en rutas relativas comunes solo si existen y tienen llaves
+const envPaths = ["./.env", "../.env", "../../.env"];
 for (const p of envPaths) {
   try {
-    await load({ export: true, envPath: p });
-    break;
+    const stat = Deno.statSync(p);
+    if (stat.isFile) {
+      const loaded = await load({ export: true, envPath: p });
+      if (Object.keys(loaded).length > 0) {
+        break;
+      }
+    }
   } catch {
-    // Continuar buscando
+    // Continuar buscando en la siguiente ruta
   }
 }
 

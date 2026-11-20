@@ -13,7 +13,7 @@ import { FormsModule } from '@angular/forms';
 import { Task } from '../../core/models/task.model';
 import { AuthService } from '../../core/services/auth.service';
 import { ApiService } from '../../core/services/api.service';
-import { CalendarViewType, TaskStore } from '../../core/stores/task.store';
+import { CalendarViewType, TaskStore, TaskTimeScope } from '../../core/stores/task.store';
 import { AppIconComponent } from '../../shared/components/app-icon/app-icon.component';
 import { TaskDetailModalComponent } from '../../shared/components/task-detail-modal/task-detail-modal.component';
 
@@ -48,6 +48,9 @@ export class AgendaComponent implements OnInit {
       this.store.selectedDate();
       this.store.selectedView();
       this.store.filterUserId();
+      this.store.filterTimeScope();
+      this.store.filterPriority();
+      this.store.searchQuery();
       this.cdr.markForCheck();
     });
   }
@@ -196,6 +199,50 @@ export class AgendaComponent implements OnInit {
   changeView(view: CalendarViewType): void {
     this.store.setView(view);
   }
+
+  setTimeScope(scope: TaskTimeScope): void {
+    this.store.filterTimeScope.set(scope);
+  }
+
+  setPriorityFilter(priority: string | number | null): void {
+    if (priority === null || priority === '' || priority === 'all') {
+      this.store.filterPriority.set(null);
+      return;
+    }
+    const num = Number(priority);
+    this.store.filterPriority.set(isNaN(num) ? null : num);
+  }
+
+  toggleTaskQuick(task: Task, event: Event): void {
+    event.stopPropagation();
+    this.store.toggleTaskStatus(task);
+  }
+
+  getStatusLabel(status: number): string {
+    switch (status) {
+      case 3:
+        return 'Hecha';
+      case 2:
+        return 'En progreso';
+      default:
+        return 'Pendiente';
+    }
+  }
+
+  readonly scopedListTitle = computed(() => {
+    switch (this.store.filterTimeScope()) {
+      case 'today':
+        return 'Tareas de Hoy';
+      case 'upcoming':
+        return 'Próximas Tareas';
+      case 'overdue':
+        return 'Tareas Vencidas';
+      case 'completed':
+        return 'Tareas Completadas';
+      default:
+        return 'Todas las Tareas';
+    }
+  });
 
   formatHour(hour: number): string {
     return hour < 10 ? `0${hour}:00` : `${hour}:00`;

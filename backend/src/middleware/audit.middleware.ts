@@ -1,5 +1,25 @@
 import type { Context, MiddlewareHandler, Next } from "hono";
-import { supabase } from "../config/supabase.ts";
+import {
+  extractUserIdFromRequest,
+  getSupabaseForRequest,
+  getSupabaseUserClient,
+  supabase,
+} from "../config/supabase.ts";
+
+const UUID_IN_PATH_REGEX = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+
+function sanitizePayload(body: unknown): unknown {
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return body;
+  }
+  const clone: Record<string, unknown> = { ...(body as Record<string, unknown>) };
+  for (const secretKey of ["password", "token", "refreshToken", "access_token", "refresh_token"]) {
+    if (secretKey in clone) {
+      clone[secretKey] = "[REDACTED]";
+    }
+  }
+  return clone;
+}
 
 export const auditMiddleware = (): MiddlewareHandler => {
   return async (c: Context, next: Next) => {
@@ -13,31 +33,27 @@ export const auditMiddleware = (): MiddlewareHandler => {
       c.req.header("cf-connecting-ip") ||
       c.req.header("x-real-ip") ||
       "127.0.0.1";
-    
-    // Si la IP viene con puerto (ej: "192.168.1.1:54321"), extraer solo la IP para inet
+
     const cleanIp =
       rawIp.includes(":") && !rawIp.includes("[") && rawIp.indexOf(":") === rawIp.lastIndexOf(":")
         ? rawIp.split(":")[0]
         : rawIp;
 
-    // Limitar User-Agent a 500 caracteres para evitar sobrecarga o TOAST
     const rawUa = c.req.header("user-agent") || "Unknown";
     const userAgent = rawUa.length > 500 ? rawUa.substring(0, 500) : rawUa;
 
-    // Clonar body para auditoría en peticiones de mutación
     let reqBody: unknown = null;
     if (["POST", "PUT", "PATCH"].includes(method)) {
       try {
-        reqBody = await c.req.json();
+        reqBody = sanitizePayload(await c.req.json());
       } catch {
-        // En caso de multipart o vacío
+        // Ignorar cuerpos no JSON
       }
     }
 
-    // Ejecutar el handler de negocio primero
+    // Ejecutar handler de negocio primero
     await next();
 
-    // Mapeo de método HTTP a enum de auditoría (1=INSERT, 2=UPDATE, 3=DELETE, 4=SELECT)
     const actionMap: Record<string, number> = {
       POST: 1,
       PUT: 2,
@@ -47,18 +63,28 @@ export const auditMiddleware = (): MiddlewareHandler => {
     };
     const action = actionMap[method] || 4;
 
-    // Solo auditar si la respuesta fue exitosa y no es healthcheck
+    // Auditar peticiones relevantes exitosas (excluyendo healthcheck)
     if (c.res.status >= 200 && c.res.status < 400 && !path.includes("/health")) {
-      const user = c.get("user") as { id: string } | undefined;
+      const userId = extractUserIdFromRequest(c);
+      const pathMatch = path.match(UUID_IN_PATH_REGEX);
+      const recordId = (c.get("auditRecordId") as string | undefined) || (pathMatch ? pathMatch[0] : null);
+      const auditToken = c.get("auditToken") as string | undefined;
       const durationMs = Date.now() - startTime;
 
-      // Inserción asíncrona en audit_logs sin bloquear la respuesta del usuario
+      const dbClient = auditToken
+        ? getSupabaseUserClient(`Bearer ${auditToken}`)
+        : c.req.header("Authorization")
+        ? getSupabaseForRequest(c)
+        : supabase;
+
+      // Inserción asíncrona no bloqueante
       (async () => {
         try {
           const tableName = (path.split("/")[2] || "api").substring(0, 63);
-          await supabase.from("audit_logs").insert({
-            user_id: user?.id || null,
+          const { error } = await dbClient.from("audit_logs").insert({
+            user_id: auditToken || c.req.header("Authorization") ? userId : null,
             table_name: tableName,
+            record_id: recordId,
             action: action,
             old_data: null,
             new_data: reqBody
@@ -67,8 +93,11 @@ export const auditMiddleware = (): MiddlewareHandler => {
             ip_address: cleanIp,
             user_agent: userAgent,
           });
+          if (error) {
+            console.error("⚠️ Error guardando audit_log:", error.message);
+          }
         } catch (err) {
-          console.error("⚠️ Error en auditMiddleware:", err);
+          console.error("⚠️ Excepción en auditMiddleware:", err);
         }
       })();
     }

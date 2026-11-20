@@ -1,6 +1,10 @@
 import { Hono, type Context } from "hono";
 import { z } from "zod";
-import { supabase } from "../config/supabase.ts";
+import {
+  getSupabaseForRequest,
+  getSupabaseUserClient,
+  supabase,
+} from "../config/supabase.ts";
 
 export const authRouter = new Hono();
 
@@ -27,7 +31,7 @@ authRouter.post("/login", async (c: Context) => {
 
     const { email, password } = parsed.data;
 
-    // Autenticar contra Supabase Auth mediante conexión segura de backend
+    // Autenticar contra Supabase Auth
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -38,29 +42,37 @@ authRouter.post("/login", async (c: Context) => {
     }
 
     const userId = data.user.id;
+    const accessToken = data.session.access_token;
 
-    // Obtener perfil y rol asignado
-    const { data: profile } = await supabase
+    // Registrar contexto autenticado para auditMiddleware
+    c.set("auditUserId", userId);
+    c.set("auditToken", accessToken);
+
+    // Usar cliente scoped con el JWT recién emitido (respeta RLS)
+    const userDb = getSupabaseUserClient(`Bearer ${accessToken}`);
+
+    const { data: profile } = await userDb
       .from("profiles")
       .select("display_name, email, timezone")
       .eq("id", userId)
-      .single();
+      .maybeSingle();
 
-    const { data: roleRow } = await supabase
+    const { data: roleRow } = await userDb
       .from("user_roles")
       .select("role")
       .eq("user_id", userId)
-      .single();
+      .maybeSingle();
 
     const role = (roleRow?.role as 1 | 2) || 1;
 
     return c.json({
-      token: data.session.access_token,
+      token: accessToken,
       refreshToken: data.session.refresh_token,
       expiresAt: data.session.expires_at,
       user: {
         id: userId,
-        displayName: profile?.display_name || data.user.user_metadata?.display_name || email.split("@")[0],
+        displayName:
+          profile?.display_name || data.user.user_metadata?.display_name || email.split("@")[0],
         email: data.user.email,
         timezone: profile?.timezone || "America/Santo_Domingo",
         role,
@@ -90,43 +102,38 @@ authRouter.post("/register", async (c: Context) => {
       options: {
         data: {
           display_name: displayName,
+          role: 1, // Trigger handle_new_user() crea profiles y user_roles con SECURITY DEFINER
         },
       },
     });
 
-    if (error) {
-      return c.json({ error: error.message }, 400);
+    if (error || !data.user) {
+      return c.json({ error: error?.message || "No se pudo completar el registro" }, 400);
     }
 
     const user = data.user;
-    if (user) {
-      // Asegurar perfil
-      await supabase.from("profiles").upsert({
-        id: user.id,
-        display_name: displayName,
-        email: user.email,
-        timezone: "America/Santo_Domingo",
-      });
-
-      // Asignar rol por defecto: 1 = Miembro
-      await supabase.from("user_roles").upsert({
-        user_id: user.id,
-        role: 1,
-      });
+    if (data.session?.access_token) {
+      c.set("auditUserId", user.id);
+      c.set("auditToken", data.session.access_token);
     }
 
-    return c.json({
-      success: true,
-      message: "Registro exitoso",
-      session: data.session,
-      user: {
-        id: user?.id,
-        email: user?.email,
-        displayName,
-        role: 1,
-        roleLabel: "Miembro",
+    return c.json(
+      {
+        success: true,
+        message: "Registro exitoso",
+        token: data.session?.access_token || null,
+        refreshToken: data.session?.refresh_token || null,
+        session: data.session,
+        user: {
+          id: user.id,
+          email: user.email,
+          displayName,
+          role: 1,
+          roleLabel: "Miembro",
+        },
       },
-    }, 201);
+      201
+    );
   } catch (err: any) {
     return c.json({ error: "Error interno al registrar usuario", details: err.message }, 500);
   }
@@ -140,23 +147,28 @@ authRouter.get("/me", async (c: Context) => {
   }
 
   const token = authHeader.replace("Bearer ", "").trim();
-  const { data: { user }, error } = await supabase.auth.getUser(token);
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser(token);
 
   if (error || !user) {
     return c.json({ error: "Sesión inválida o expirada" }, 401);
   }
 
-  const { data: profile } = await supabase
+  const userDb = getSupabaseForRequest(c);
+
+  const { data: profile } = await userDb
     .from("profiles")
     .select("display_name, email, timezone")
     .eq("id", user.id)
-    .single();
+    .maybeSingle();
 
-  const { data: roleRow } = await supabase
+  const { data: roleRow } = await userDb
     .from("user_roles")
     .select("role")
     .eq("user_id", user.id)
-    .single();
+    .maybeSingle();
 
   const role = (roleRow?.role as 1 | 2) || 1;
 

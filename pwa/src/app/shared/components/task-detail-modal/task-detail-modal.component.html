@@ -1,10 +1,10 @@
 @if (store.activeTaskDetail(); as detail) {
   <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
     <div class="bg-nora-surface-dark border border-nora-border-dark w-full max-w-md rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-      
+
       <!-- Header del Modal -->
       <div class="p-4 border-b border-nora-border-dark flex items-start justify-between bg-nora-surface-elevatedDark/50">
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 flex-wrap">
           <span
             class="text-[11px] font-mono px-2 py-0.5 rounded border font-semibold"
             [class]="getPriorityClass(detail.task.priority)"
@@ -13,119 +13,270 @@
           </span>
           <span
             class="text-[11px] px-2 py-0.5 rounded border font-medium"
-            [class]="detail.task.status === 3 ? 'bg-emerald-950/60 border-emerald-800 text-emerald-300' : 'bg-slate-800 border-slate-700 text-slate-300'"
+            [class]="detail.task.status === 3 ? 'bg-emerald-950/60 border-emerald-800 text-emerald-300' : detail.task.status === 2 ? 'bg-indigo-950/60 border-indigo-800 text-indigo-300' : 'bg-slate-800 border-slate-700 text-slate-300'"
           >
-            {{ detail.task.status === 3 ? 'Completada' : 'Pendiente' }}
+            {{ getStatusLabel(detail.task.status) }}
           </span>
         </div>
-        <button
-          (click)="close()"
-          class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors"
-          aria-label="Cerrar"
-        >
-          ✕
-        </button>
-      </div>
-
-      <!-- Cuerpo: Ficha Estándar -->
-      <div class="p-5 flex-1 overflow-y-auto flex flex-col gap-4">
-        <!-- Título -->
-        <div>
-          <h3
-            class="text-lg font-bold text-slate-100 leading-snug"
-            [class.line-through]="detail.task.status === 3"
-            [class.opacity-60]="detail.task.status === 3"
-          >
-            {{ detail.task.title }}
-          </h3>
-          @if (detail.task.description) {
-            <p class="text-sm text-slate-400 mt-1 leading-relaxed">
-              {{ detail.task.description }}
-            </p>
+        <div class="flex items-center gap-1">
+          @if (canEdit() && !isEditing()) {
+            <button
+              type="button"
+              (click)="startEditing()"
+              class="text-xs px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-colors"
+            >
+              Editar
+            </button>
           }
-        </div>
-
-        <!-- Metadatos de Negocio Principales -->
-        <div class="grid grid-cols-2 gap-3 p-3 bg-nora-bg-dark/80 rounded-xl border border-nora-border-dark text-xs">
-          <div class="flex items-center gap-2 text-slate-300">
-            <app-icon name="calendar-agenda" customClass="w-4 h-4 text-blue-400" />
-            <div>
-              <span class="block text-[10px] text-slate-500 uppercase tracking-wider">Fecha Límite</span>
-              <span class="font-medium">{{ detail.task.due_date || 'Sin fecha asignada' }}</span>
-            </div>
-          </div>
-
-          <div class="flex items-center gap-2 text-slate-300">
-            <app-icon name="clock-time" customClass="w-4 h-4 text-purple-400" />
-            <div>
-              <span class="block text-[10px] text-slate-500 uppercase tracking-wider">Hora Programada</span>
-              <span class="font-medium">{{ detail.task.due_time ? detail.task.due_time.substring(0, 5) : 'Todo el día' }}</span>
-            </div>
-          </div>
-
-          <div class="flex items-center gap-2 text-slate-300 col-span-2 pt-2 border-t border-slate-800">
-            <app-icon name="users-group" customClass="w-4 h-4 text-amber-400" />
-            <div>
-              <span class="block text-[10px] text-slate-500 uppercase tracking-wider">Responsable</span>
-              <span class="font-medium text-slate-200">{{ detail.task.responsible_name || 'Asignado a mí' }}</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Botón Clave Requerido: "Ver información detallada" -->
-        <div class="pt-1">
           <button
             type="button"
-            (click)="toggleAuditInfo()"
-            class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-nora-border-dark transition-all text-xs text-slate-200 font-medium"
+            (click)="close()"
+            class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors"
+            aria-label="Cerrar"
           >
-            <div class="flex items-center gap-2">
-              <app-icon name="info-detail" customClass="w-4 h-4 text-cyan-400" />
-              <span>Ver información detallada</span>
-            </div>
-            <span class="text-slate-400 transition-transform" [class.rotate-180]="showAuditInfo()">
-              ▼
-            </span>
+            ✕
           </button>
         </div>
+      </div>
 
-        <!-- Panel Desplegable de Auditoría y Trazabilidad -->
-        @if (showAuditInfo()) {
-          <div class="p-3.5 bg-slate-900/90 rounded-xl border border-cyan-900/50 flex flex-col gap-2.5 text-xs animate-fade-in font-mono">
-            <div class="flex items-center justify-between pb-1.5 border-b border-slate-800">
-              <span class="text-slate-400">Creada por:</span>
-              <span class="font-semibold text-cyan-300">{{ detail.audit_detail.creator_name }}</span>
+      <!-- Cuerpo: Ficha Estándar / Modo Edición -->
+      <div class="p-5 flex-1 overflow-y-auto flex flex-col gap-4">
+        @if (isEditing()) {
+          <!-- Formulario de Edición con Validación Junto al Campo (RF-07, RF-10) -->
+          <div class="flex flex-col gap-3 text-xs">
+            @if (saveError()) {
+              <div class="p-2.5 rounded-lg bg-rose-950/60 border border-rose-700 text-rose-200 text-xs">
+                {{ saveError() }}
+              </div>
+            }
+
+            <div>
+              <label class="block text-[11px] text-slate-400 font-semibold mb-1">Título *</label>
+              <input
+                type="text"
+                [ngModel]="editForm().title"
+                (ngModelChange)="updateEditField('title', $event)"
+                placeholder="Título de la tarea"
+                class="w-full bg-slate-900 border rounded-lg px-3 py-2 text-slate-100 focus:outline-none"
+                [class]="titleError() ? 'border-rose-500' : 'border-nora-border-dark focus:border-nora-primary'"
+              />
+              @if (titleError()) {
+                <p class="text-[11px] text-rose-400 mt-1">{{ titleError() }}</p>
+              }
             </div>
 
-            <div class="flex items-center justify-between pb-1.5 border-b border-slate-800">
-              <span class="text-slate-400">Fecha y hora exacta:</span>
-              <span class="text-slate-200">{{ detail.audit_detail.created_at | date:'yyyy-MM-dd HH:mm:ss' }}</span>
+            <div>
+              <label class="block text-[11px] text-slate-400 font-semibold mb-1">Descripción</label>
+              <textarea
+                rows="2"
+                [ngModel]="editForm().description"
+                (ngModelChange)="updateEditField('description', $event)"
+                placeholder="Notas o detalles..."
+                class="w-full bg-slate-900 border border-nora-border-dark rounded-lg px-3 py-2 text-slate-100 focus:outline-none focus:border-nora-primary"
+              ></textarea>
             </div>
 
-            <div class="flex items-center justify-between pb-1.5 border-b border-slate-800">
-              <span class="text-slate-400">Origen / Canal:</span>
-              <span class="font-medium" [class]="detail.task.source === 2 ? 'text-purple-300' : 'text-blue-300'">
-                {{ detail.audit_detail.source_channel }}
-              </span>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-[11px] text-slate-400 font-semibold mb-1">Fecha Límite</label>
+                <input
+                  type="date"
+                  [ngModel]="editForm().due_date"
+                  (ngModelChange)="updateEditField('due_date', $event)"
+                  class="w-full bg-slate-900 border rounded-lg px-2.5 py-2 text-slate-100 focus:outline-none"
+                  [class]="dateError() ? 'border-rose-500' : 'border-nora-border-dark focus:border-nora-primary'"
+                />
+                @if (dateError()) {
+                  <p class="text-[11px] text-rose-400 mt-1">{{ dateError() }}</p>
+                }
+              </div>
+
+              <div>
+                <label class="block text-[11px] text-slate-400 font-semibold mb-1">Hora</label>
+                <input
+                  type="time"
+                  [ngModel]="editForm().due_time"
+                  (ngModelChange)="updateEditField('due_time', $event)"
+                  class="w-full bg-slate-900 border border-nora-border-dark rounded-lg px-2.5 py-2 text-slate-100 focus:outline-none focus:border-nora-primary"
+                />
+              </div>
             </div>
 
-            <div class="flex items-center justify-between pb-1.5 border-b border-slate-800">
-              <span class="text-slate-400">IP del Cliente:</span>
-              <span class="text-slate-300">{{ detail.audit_detail.ip_address }}</span>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-[11px] text-slate-400 font-semibold mb-1">Prioridad</label>
+                <select
+                  [ngModel]="editForm().priority"
+                  (ngModelChange)="updatePriorityField($event)"
+                  class="w-full bg-slate-900 border border-nora-border-dark rounded-lg px-2.5 py-2 text-slate-100 focus:outline-none focus:border-nora-primary"
+                >
+                  <option [ngValue]="1">Baja</option>
+                  <option [ngValue]="2">Media</option>
+                  <option [ngValue]="3">Alta / Urgente</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-[11px] text-slate-400 font-semibold mb-1">Responsable</label>
+                <input
+                  type="text"
+                  [ngModel]="editForm().responsible_name"
+                  (ngModelChange)="updateEditField('responsible_name', $event)"
+                  placeholder="Ej. Juan"
+                  class="w-full bg-slate-900 border border-nora-border-dark rounded-lg px-2.5 py-2 text-slate-100 focus:outline-none focus:border-nora-primary"
+                />
+              </div>
             </div>
 
-            <div class="flex flex-col gap-1 pt-1">
-              <span class="text-slate-400 text-[11px]">Dispositivo / User-Agent:</span>
-              <span class="text-slate-400 text-[10px] break-all bg-slate-950 p-1.5 rounded border border-slate-800/80">
-                {{ detail.audit_detail.device_info }}
-              </span>
-            </div>
-
-            <div class="flex items-center justify-between pt-1 border-t border-slate-800/80 text-[11px] text-slate-500">
-              <span>Última actualización:</span>
-              <span>{{ detail.audit_detail.last_updated | date:'short' }}</span>
+            <div class="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                (click)="cancelEditing()"
+                [disabled]="isSaving()"
+                class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                (click)="saveEdit()"
+                [disabled]="isSaving()"
+                class="px-4 py-2 rounded-xl bg-nora-primary hover:bg-nora-primary-hover text-white text-xs font-semibold transition"
+              >
+                {{ isSaving() ? 'Guardando...' : 'Guardar cambios' }}
+              </button>
             </div>
           </div>
+        } @else {
+          <!-- Título -->
+          <div>
+            <h3
+              class="text-lg font-bold text-slate-100 leading-snug"
+              [class.line-through]="detail.task.status === 3"
+              [class.opacity-60]="detail.task.status === 3"
+            >
+              {{ detail.task.title }}
+            </h3>
+            @if (detail.task.description) {
+              <p class="text-sm text-slate-400 mt-1 leading-relaxed">
+                {{ detail.task.description }}
+              </p>
+            }
+          </div>
+
+          <!-- Selector Rápido de Estado con 1 Toque (RF-08) -->
+          <div class="flex flex-col gap-1.5">
+            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Cambiar estado rápido</span>
+            <div class="grid grid-cols-3 gap-1.5 text-[11px]">
+              <button
+                type="button"
+                (click)="setStatus(1)"
+                class="py-2 px-2 rounded-xl border font-medium transition-all"
+                [class]="detail.task.status === 1 ? 'bg-slate-700 border-slate-400 text-white shadow-sm' : 'bg-slate-900/70 border-nora-border-dark text-slate-400 hover:text-slate-200'"
+              >
+                Pendiente
+              </button>
+              <button
+                type="button"
+                (click)="setStatus(2)"
+                class="py-2 px-2 rounded-xl border font-medium transition-all"
+                [class]="detail.task.status === 2 ? 'bg-indigo-600/80 border-indigo-400 text-white shadow-sm' : 'bg-slate-900/70 border-nora-border-dark text-slate-400 hover:text-slate-200'"
+              >
+                En progreso
+              </button>
+              <button
+                type="button"
+                (click)="setStatus(3)"
+                class="py-2 px-2 rounded-xl border font-medium transition-all"
+                [class]="detail.task.status === 3 ? 'bg-emerald-600/80 border-emerald-400 text-white shadow-sm' : 'bg-slate-900/70 border-nora-border-dark text-slate-400 hover:text-slate-200'"
+              >
+                Hecha
+              </button>
+            </div>
+          </div>
+
+          <!-- Metadatos de Negocio Principales -->
+          <div class="grid grid-cols-2 gap-3 p-3 bg-nora-bg-dark/80 rounded-xl border border-nora-border-dark text-xs">
+            <div class="flex items-center gap-2 text-slate-300">
+              <app-icon name="calendar-agenda" customClass="w-4 h-4 text-blue-400" />
+              <div>
+                <span class="block text-[10px] text-slate-500 uppercase tracking-wider">Fecha Límite</span>
+                <span class="font-medium">{{ detail.task.due_date || 'Sin fecha asignada' }}</span>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-2 text-slate-300">
+              <app-icon name="clock-time" customClass="w-4 h-4 text-purple-400" />
+              <div>
+                <span class="block text-[10px] text-slate-500 uppercase tracking-wider">Hora Programada</span>
+                <span class="font-medium">{{ detail.task.due_time ? detail.task.due_time.substring(0, 5) : 'Todo el día' }}</span>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-2 text-slate-300 col-span-2 pt-2 border-t border-slate-800">
+              <app-icon name="users-group" customClass="w-4 h-4 text-amber-400" />
+              <div>
+                <span class="block text-[10px] text-slate-500 uppercase tracking-wider">Responsable</span>
+                <span class="font-medium text-slate-200">{{ detail.task.responsible_name || 'Asignado a mí' }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Botón Clave Requerido: "Ver información detallada" -->
+          <div class="pt-1">
+            <button
+              type="button"
+              (click)="toggleAuditInfo()"
+              class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-nora-border-dark transition-all text-xs text-slate-200 font-medium"
+            >
+              <div class="flex items-center gap-2">
+                <app-icon name="info-detail" customClass="w-4 h-4 text-cyan-400" />
+                <span>Ver información detallada</span>
+              </div>
+              <span class="text-slate-400 transition-transform" [class.rotate-180]="showAuditInfo()">
+                ▼
+              </span>
+            </button>
+          </div>
+
+          <!-- Panel Desplegable de Auditoría y Trazabilidad -->
+          @if (showAuditInfo()) {
+            <div class="p-3.5 bg-slate-900/90 rounded-xl border border-cyan-900/50 flex flex-col gap-2.5 text-xs animate-fade-in font-mono">
+              <div class="flex items-center justify-between pb-1.5 border-b border-slate-800">
+                <span class="text-slate-400">Creada por:</span>
+                <span class="font-semibold text-cyan-300">{{ detail.audit_detail.creator_name }}</span>
+              </div>
+
+              <div class="flex items-center justify-between pb-1.5 border-b border-slate-800">
+                <span class="text-slate-400">Fecha y hora exacta:</span>
+                <span class="text-slate-200">{{ detail.audit_detail.created_at | date:'yyyy-MM-dd HH:mm:ss' }}</span>
+              </div>
+
+              <div class="flex items-center justify-between pb-1.5 border-b border-slate-800">
+                <span class="text-slate-400">Origen / Canal:</span>
+                <span class="font-medium" [class]="detail.task.source === 2 ? 'text-purple-300' : 'text-blue-300'">
+                  {{ detail.audit_detail.source_channel }}
+                </span>
+              </div>
+
+              <div class="flex items-center justify-between pb-1.5 border-b border-slate-800">
+                <span class="text-slate-400">IP del Cliente:</span>
+                <span class="text-slate-300">{{ detail.audit_detail.ip_address }}</span>
+              </div>
+
+              <div class="flex flex-col gap-1 pt-1">
+                <span class="text-slate-400 text-[11px]">Dispositivo / User-Agent:</span>
+                <span class="text-slate-400 text-[10px] break-all bg-slate-950 p-1.5 rounded border border-slate-800/80">
+                  {{ detail.audit_detail.device_info }}
+                </span>
+              </div>
+
+              <div class="flex items-center justify-between pt-1 border-t border-slate-800/80 text-[11px] text-slate-500">
+                <span>Última actualización:</span>
+                <span>{{ detail.audit_detail.last_updated | date:'short' }}</span>
+              </div>
+            </div>
+          }
         }
       </div>
 
@@ -159,12 +310,11 @@
         <button
           type="button"
           (click)="close()"
-          class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-medium border border-slate-700 transition-colors"
+          class="px-4 py-2 rounded-xl text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-colors"
         >
           Cerrar
         </button>
       </div>
-
     </div>
   </div>
 }
