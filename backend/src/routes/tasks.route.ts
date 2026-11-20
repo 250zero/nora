@@ -142,12 +142,15 @@ tasksRouter.post("/", async (c: Context) => {
 
     const ownerId = c.req.header("X-User-Id") || "a0000000-0000-0000-0000-000000000001";
 
+    const taskPayload = {
+      ...validated,
+      due_time: validated.due_time || (validated.due_date ? "09:00:00" : null),
+      owner_id: ownerId,
+    };
+
     const { data, error } = await supabase
       .from("tasks")
-      .insert({
-        ...validated,
-        owner_id: ownerId,
-      })
+      .insert(taskPayload)
       .select()
       .single();
 

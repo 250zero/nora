@@ -140,6 +140,11 @@ export class AgendaComponent implements OnInit {
     return this.store.tasksByDate().get(iso) || [];
   });
 
+  // Tareas de todo el día o sin hora fija para la vista de Día
+  readonly allDayTasks = computed<Task[]>(() => {
+    return this.dayTasks().filter((t) => !t.due_time);
+  });
+
   openTaskDetail(task: Task, event: Event): void {
     event.stopPropagation();
     this.store.loadTaskDetail(task.id);

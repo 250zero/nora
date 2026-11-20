@@ -33,15 +33,15 @@ const toolsDeclaration = [
           properties: {
             title: {
               type: "STRING",
-              description: "Título o nombre descriptivo de la tarea o reunión",
+              description: "Título o nombre descriptivo de la tarea o compromiso",
             },
             due_date: {
               type: "STRING",
-              description: "Fecha de vencimiento en formato YYYY-MM-DD",
+              description: "Fecha de la tarea en formato YYYY-MM-DD",
             },
             due_time: {
               type: "STRING",
-              description: "Hora en formato HH:mm (24 horas, ej. 09:30 o 15:00)",
+              description: "Hora fija en formato HH:mm (24 horas, ej. '09:00' o '10:00'). Si el usuario no especificó hora (por ejemplo al usar 'mañana', 'pasado mañana', 'el viernes', etc.), ASIGNA OBLIGATORIAMENTE una hora fija con bloque de 1 hora: '09:00' por defecto, o '10:00', '11:00' si hay varias tareas el mismo día. Nunca dejes este campo vacío.",
             },
             priority: {
               type: "NUMBER",
@@ -49,7 +49,7 @@ const toolsDeclaration = [
             },
             responsible_name: {
               type: "STRING",
-              description: "Nombre del responsable o persona con quien es el compromiso",
+              description: "Nombre del responsable o persona involucrada si se menciona",
             },
             description: {
               type: "STRING",
@@ -141,11 +141,16 @@ export async function executeTool(
     }
 
     case "crear_tarea": {
+      let finalDueTime = args.due_time ? (args.due_time.length === 5 ? `${args.due_time}:00` : args.due_time) : null;
+      if (!finalDueTime && args.due_date) {
+        finalDueTime = "09:00:00"; // Hora fija por defecto: 9:00 AM (bloque de 1 hora)
+      }
+
       const newTask = {
         owner_id: userId,
         title: args.title,
         due_date: args.due_date,
-        due_time: args.due_time ? (args.due_time.length === 5 ? `${args.due_time}:00` : args.due_time) : null,
+        due_time: finalDueTime,
         priority: args.priority || 2,
         responsible_name: args.responsible_name || null,
         description: args.description || null,
@@ -163,8 +168,13 @@ export async function executeTool(
         return { result: { success: false, error: error.message } };
       }
 
+      const formattedHour = data.due_time ? data.due_time.substring(0, 5) : "09:00";
       return {
-        result: { success: true, task: data, message: `Tarea "${args.title}" agendada exitosamente.` },
+        result: {
+          success: true,
+          task: data,
+          message: `Tarea "${args.title}" agendada exitosamente para el ${data.due_date} a las ${formattedHour}.`,
+        },
       };
     }
 
@@ -249,27 +259,43 @@ export async function chatWithNora(
     minute: "2-digit",
   };
   const currentDateStr = new Intl.DateTimeFormat("es-DO", options).format(now);
-  const currentIsoDate = now.toISOString().split("T")[0];
+  
+  // Fecha ISO estricta en zona horaria local de Santo Domingo (evita desfase UTC de madrugada)
+  const doDateFormatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Santo_Domingo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const currentIsoDate = doDateFormatter.format(now);
 
   const systemPrompt = `
 Eres Nora, una asistente ejecutiva inteligente, empática y de alta precisión especializada en la gestión ágil de agenda y tareas.
 Zona horaria del sistema: America/Santo_Domingo (UTC-4, hora local de República Dominicana).
-Fecha y hora actual: ${currentDateStr} (ISO: ${currentIsoDate}).
+Fecha y hora actual local: ${currentDateStr} (Fecha ISO local: ${currentIsoDate}).
 
 REGLAS ESTRICTAS DE COMPORTAMIENTO:
 1. CREACIÓN DE TAREAS Y RECORDATORIOS:
-   - Cuando el usuario solicite crear, agendar o agregar tareas (por ejemplo: "crea una tarea de cumpleaños para el viernes", "anota ir al supermercado", "recuérdame visitar a Juana el sábado"), DEBES LLAMAR DIRECTAMENTE a la herramienta "crear_tarea" para CADA tarea que el usuario mencione.
-   - Si el usuario no especifica una hora exacta para una tarea (ej. "el viernes"), puedes dejar due_time vacío (null) o poner una hora tentativa habitual (ej. "09:00", "10:00" o "15:00"), pero SIEMPRE debes ejecutar "crear_tarea" inmediatamente sin detenerte a preguntar.
-   - Si el usuario pide crear múltiples tareas en un solo mensaje, emite una llamada a "crear_tarea" para CADA UNA de ellas en la misma respuesta.
+   - Cuando el usuario solicite crear, agendar o registrar tareas (ejemplos: "crea una tarea para mañana...", "anota ir al supermercado", "tarea de cumpleaños el viernes", "visitar a Juana el sábado", "hacer la compra con María el viernes"):
+     * DEBES LLAMAR DIRECTAMENTE a la herramienta "crear_tarea" para CADA tarea solicitada.
+     * REGLA DE HORA FIJA POR DEFECTO (BLOQUE DE 1 HORA):
+       - Cuando el usuario use expresiones relativas ("mañana", "pasado mañana", "el viernes", "el sábado", "el lunes") o no especifique una hora exacta:
+         - NUNCA dejes due_time en null ni vacío.
+         - Asigna OBLIGATORIAMENTE una hora fija en bloques de 1 hora.
+         - La hora predeterminada estándar es las "09:00" (9:00 AM).
+         - Si se agendan dos o más tareas para el mismo día sin hora explícita, asigna bloques consecutivos de 1 hora fija: la primera a las "09:00", la segunda a las "10:00", la tercera a las "11:00", la cuarta a las "14:00", etc.
+     * NUNCA llames a "consultar_horas_libres" ante órdenes de creación ("crea...", "agenda...", "anota...", "recuérdame..."). Solo debes llamar a "crear_tarea".
+     * Si el usuario pide crear múltiples tareas en un solo mensaje, emite una llamada a "crear_tarea" para CADA UNA de ellas en la misma respuesta en paralelo.
 
-2. GESTIÓN DE HORAS LIBRES / REUNIONES:
-   - Solo debes llamar a "consultar_horas_libres" cuando el usuario pregunte explícitamente por su disponibilidad o cuándo tiene tiempo para una reunión o cita (por ejemplo: "¿qué horas tengo libres el viernes?", "¿a qué hora puedo reunirme con el cliente mañana?").
+2. GESTIÓN DE HORAS LIBRES / CONSULTA DE DISPONIBILIDAD:
+   - Solo debes llamar a "consultar_horas_libres" cuando el usuario formule una PREGUNTA directa sobre su disponibilidad o espacio libre (ejemplos: "¿qué horas tengo libres el viernes?", "¿a qué hora tengo espacio mañana?").
 
 3. ELIMINACIÓN SEGURA:
    - Si el usuario pide borrar una tarea sin especificar confirmación, antes de borrarla pregunta: "¿Estás seguro de que deseas eliminar la tarea [Nombre]?" indicando que la acción es definitiva.
+   - Solo el creador de la tarea tiene permitido eliminarla.
 
 4. TONO Y FORMATO:
-   - Profesional, conciso, cálido y enfocado en la productividad. Confirma siempre las tareas creadas con su título y fecha correspondiente.
+   - Profesional, conciso, cálido y enfocado en la productividad. Confirma siempre las tareas creadas con su título, fecha y hora fija asignada (ejemplo: "a las 09:00 AM").
 `;
 
   // Construir historial de mensajes en formato Gemini
@@ -357,8 +383,39 @@ REGLAS ESTRICTAS DE COMPORTAMIENTO:
       const executedNames: string[] = [];
       const createdTasksList: string[] = [];
 
+      // Control de horas fijas por defecto de 1 hora para evitar colisiones en la misma fecha
+      const defaultHourlySlots = [
+        "09:00:00",
+        "10:00:00",
+        "11:00:00",
+        "14:00:00",
+        "15:00:00",
+        "16:00:00",
+        "17:00:00",
+      ];
+      const usedSlotsByDate = new Map<string, Set<string>>();
+
       for (const fc of functionCalls) {
         executedNames.push(fc.name);
+
+        if (fc.name === "crear_tarea") {
+          const taskDate = fc.args.due_date || currentIsoDate;
+          if (!usedSlotsByDate.has(taskDate)) {
+            usedSlotsByDate.set(taskDate, new Set());
+          }
+          const dateUsed = usedSlotsByDate.get(taskDate)!;
+
+          if (!fc.args.due_time) {
+            // Asignar el siguiente bloque fijo de 1 hora disponible para este día
+            const availableSlot = defaultHourlySlots.find((s) => !dateUsed.has(s)) || "09:00:00";
+            fc.args.due_time = availableSlot.substring(0, 5); // "09:00"
+            dateUsed.add(availableSlot);
+          } else {
+            const normalized = fc.args.due_time.length === 5 ? `${fc.args.due_time}:00` : fc.args.due_time;
+            dateUsed.add(normalized);
+          }
+        }
+
         const toolOutput = await executeTool(fc.name, fc.args, userId);
         if (toolOutput.suggestedSlots) {
           suggestedSlots = toolOutput.suggestedSlots;
@@ -368,8 +425,10 @@ REGLAS ESTRICTAS DE COMPORTAMIENTO:
         }
 
         if (fc.name === "crear_tarea" && toolOutput.result?.task) {
+          const t = toolOutput.result.task;
+          const displayTime = t.due_time ? ` a las ${t.due_time.substring(0, 5)}` : (fc.args.due_time ? ` a las ${fc.args.due_time}` : " a las 09:00");
           createdTasksList.push(
-            `• **${fc.args.title}** para el ${fc.args.due_date}${fc.args.due_time ? ' a las ' + fc.args.due_time : ''}`
+            `• **${fc.args.title}** para el ${fc.args.due_date}${displayTime}`
           );
         }
 
