@@ -3,6 +3,7 @@ import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@ang
 import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { AppIconComponent } from '../../shared/components/app-icon/app-icon.component';
+import { DataTableComponent, DataTableColumn } from '../../shared/components/data-table';
 
 export interface AuditLogItem {
   id: string;
@@ -20,7 +21,7 @@ export interface AuditLogItem {
 @Component({
   selector: 'app-audit-logs',
   standalone: true,
-  imports: [CommonModule, AppIconComponent],
+  imports: [CommonModule, AppIconComponent, DataTableComponent],
   templateUrl: './audit-logs.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -34,6 +35,16 @@ export class AuditLogsComponent implements OnInit {
   readonly error = signal<string | null>(null);
   readonly selectedLog = signal<AuditLogItem | null>(null);
 
+  // Columnas tipadas para el DataTable compartido
+  readonly columns: DataTableColumn<AuditLogItem>[] = [
+    { key: 'created_at', label: 'Fecha / Hora', sortable: true, width: '180px' },
+    { key: 'action', label: 'Acción', sortable: true, width: '110px' },
+    { key: 'table_name', label: 'Tabla', sortable: true, width: '130px' },
+    { key: 'ip_address', label: 'Dirección IP (inet)', sortable: true, width: '140px' },
+    { key: 'record_id', label: 'ID Registro', sortable: true },
+    { key: 'id', label: 'Detalle', sortable: false, align: 'right', width: '90px' },
+  ];
+
   ngOnInit(): void {
     this.loadAuditLogs();
   }
@@ -42,7 +53,7 @@ export class AuditLogsComponent implements OnInit {
     this.loading.set(true);
     this.error.set(null);
     this.api
-      .get<{ logs: AuditLogItem[]; total: number }>('audit-logs', { limit: 50, offset: 0 })
+      .get<{ logs: AuditLogItem[]; total: number }>('audit-logs', { limit: 100, offset: 0 })
       .subscribe({
         next: (res) => {
           this.logs.set(res.logs || []);

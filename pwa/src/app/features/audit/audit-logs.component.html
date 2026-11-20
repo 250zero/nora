@@ -49,69 +49,52 @@
     </div>
   }
 
-  <!-- Loading State -->
-  @if (loading()) {
-    <div class="flex justify-center items-center py-16">
-      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-400"></div>
-    </div>
-  } @else if (logs().length === 0) {
-    <div class="p-8 text-center bg-slate-900 border border-slate-800 rounded-xl text-slate-400 text-xs">
-      No hay eventos de auditoría registrados aún. Las operaciones se registrarán automáticamente.
-    </div>
-  } @else {
-    <!-- Tabla de Logs de Auditoría -->
-    <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-lg">
-      <div class="overflow-x-auto">
-        <table class="w-full text-left text-xs text-slate-300">
-          <thead class="bg-slate-950/80 border-b border-slate-800 text-[10px] uppercase font-bold text-slate-400 tracking-wider">
-            <tr>
-              <th class="px-4 py-3">Fecha / Hora</th>
-              <th class="px-4 py-3">Acción</th>
-              <th class="px-4 py-3">Tabla</th>
-              <th class="px-4 py-3">Dirección IP</th>
-              <th class="px-4 py-3">ID Registro</th>
-              <th class="px-4 py-3 text-right">Detalle</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-slate-800/60 font-mono">
-            @for (log of logs(); track log.id) {
-              <tr class="hover:bg-slate-800/40 transition">
-                <td class="px-4 py-3 whitespace-nowrap text-slate-400">
-                  {{ log.created_at | date:'yyyy-MM-dd HH:mm:ss' }}
-                </td>
-                <td class="px-4 py-3 whitespace-nowrap">
-                  <span
-                    class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold"
-                    [ngClass]="getActionBadgeClass(log.action)"
-                  >
-                    {{ log.action }}
-                  </span>
-                </td>
-                <td class="px-4 py-3 whitespace-nowrap text-indigo-400 font-semibold">
-                  {{ log.table_name }}
-                </td>
-                <td class="px-4 py-3 whitespace-nowrap text-amber-300">
-                  {{ log.ip_address || '127.0.0.1' }}
-                </td>
-                <td class="px-4 py-3 whitespace-nowrap text-slate-400 truncate max-w-[120px]">
-                  {{ log.record_id || '—' }}
-                </td>
-                <td class="px-4 py-3 whitespace-nowrap text-right">
-                  <button
-                    (click)="viewLogDetail(log)"
-                    class="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] rounded transition border border-slate-700"
-                  >
-                    <app-icon name="info-detail" customClass="w-3 h-3"></app-icon>
-                    <span>Ver</span>
-                  </button>
-                </td>
-              </tr>
-            }
-          </tbody>
-        </table>
-      </div>
-    </div>
-  }
+  <!-- Datatable Compartido con Paginación: 5, 10, 15, 50, 100 -->
+  <app-data-table
+    [data]="logs()"
+    [columns]="columns"
+    [pageSizeOptions]="[5, 10, 15, 50, 100]"
+    [pageSize]="10"
+    [loading]="loading()"
+    [searchable]="true"
+    [searchPlaceholder]="'Buscar por IP, tabla, acción o ID...'"
+    [emptyMessage]="'No hay eventos de auditoría registrados aún.'"
+    [rowTemplate]="auditRowTemplate"
+  >
+    <ng-template #auditRowTemplate let-log let-index="index">
+      <tr class="hover:bg-slate-800/40 transition">
+        <td class="px-4 py-3 whitespace-nowrap text-slate-400">
+          {{ log.created_at | date:'yyyy-MM-dd HH:mm:ss' }}
+        </td>
+        <td class="px-4 py-3 whitespace-nowrap">
+          <span
+            class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold"
+            [ngClass]="getActionBadgeClass(log.action)"
+          >
+            {{ log.action }}
+          </span>
+        </td>
+        <td class="px-4 py-3 whitespace-nowrap text-indigo-400 font-semibold">
+          {{ log.table_name }}
+        </td>
+        <td class="px-4 py-3 whitespace-nowrap text-amber-300">
+          {{ log.ip_address || '127.0.0.1' }}
+        </td>
+        <td class="px-4 py-3 whitespace-nowrap text-slate-400 truncate max-w-[120px]">
+          {{ log.record_id || '—' }}
+        </td>
+        <td class="px-4 py-3 whitespace-nowrap text-right">
+          <button
+            (click)="viewLogDetail(log)"
+            class="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] rounded transition border border-slate-700"
+          >
+            <app-icon name="info-detail" customClass="w-3 h-3"></app-icon>
+            <span>Ver</span>
+          </button>
+        </td>
+      </tr>
+    </ng-template>
+  </app-data-table>
 
   <!-- Modal de Detalle de Log -->
   @if (selectedLog()) {

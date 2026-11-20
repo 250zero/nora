@@ -1,0 +1,249 @@
+<div class="flex flex-col gap-3 w-full">
+  <!-- Barra Superior: Título, Buscador y Selector de Tamaño de Página -->
+  <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-slate-900/90 border border-slate-800 rounded-xl p-3 shadow-sm">
+    <!-- Título o selector de página -->
+    <div class="flex items-center gap-3">
+      @if (tableTitle()) {
+        <h3 class="text-sm font-bold text-slate-100 flex items-center gap-2">
+          <span>{{ tableTitle() }}</span>
+        </h3>
+      }
+
+      <!-- Selector de cantidad de registros por página: 5, 10, 15, 50, 100 -->
+      <div class="flex items-center gap-2 text-xs text-slate-400">
+        <label for="dt-page-size" class="whitespace-nowrap font-medium">Mostrar:</label>
+        <select
+          id="dt-page-size"
+          [value]="pageSize()"
+          (change)="onPageSizeChange($event)"
+          class="bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1 text-xs text-slate-200 font-mono focus:outline-none focus:border-indigo-500 transition-colors cursor-pointer"
+        >
+          @for (opt of pageSizeOptions(); track opt) {
+            <option [value]="opt">{{ opt }}</option>
+          }
+        </select>
+        <span class="hidden sm:inline">por página</span>
+      </div>
+    </div>
+
+    <!-- Buscador en tiempo real -->
+    @if (searchable()) {
+      <div class="relative w-full sm:w-72">
+        <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+          <app-icon name="search" customClass="w-3.5 h-3.5"></app-icon>
+        </span>
+        <input
+          type="text"
+          [ngModel]="searchQuery()"
+          (ngModelChange)="onSearchInput($event)"
+          [placeholder]="searchPlaceholder()"
+          class="w-full bg-slate-950 border border-slate-800 rounded-lg pl-9 pr-8 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-colors"
+        />
+        @if (searchQuery()) {
+          <button
+            type="button"
+            (click)="clearSearch()"
+            class="absolute inset-y-0 right-0 pr-2.5 flex items-center text-xs text-slate-500 hover:text-slate-200"
+            title="Limpiar búsqueda"
+          >
+            ✕
+          </button>
+        }
+      </div>
+    }
+  </div>
+
+  <!-- Contenedor Principal de la Tabla -->
+  <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-lg relative">
+    <!-- Overlay de carga -->
+    @if (loading()) {
+      <div class="absolute inset-0 bg-slate-950/60 backdrop-blur-[2px] z-20 flex items-center justify-center">
+        <div class="flex items-center gap-3 px-4 py-2 bg-slate-900 border border-slate-700 rounded-xl shadow-xl">
+          <div class="animate-spin rounded-full h-4 w-4 border-2 border-indigo-400 border-t-transparent"></div>
+          <span class="text-xs font-medium text-slate-300">Cargando datos...</span>
+        </div>
+      </div>
+    }
+
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-xs text-slate-300">
+        <!-- Encabezado de Columnas -->
+        <thead class="bg-slate-950/90 border-b border-slate-800 text-[10px] uppercase font-bold text-slate-400 tracking-wider select-none">
+          <tr>
+            @for (col of columns(); track col.key) {
+              <th
+                class="px-4 py-3"
+                [class]="col.headerClass || ''"
+                [style.width]="col.width"
+                [class.cursor-pointer]="col.sortable !== false"
+                (click)="toggleSort(col)"
+              >
+                <div
+                  class="flex items-center gap-1.5"
+                  [ngClass]="{
+                    'justify-end': col.align === 'right',
+                    'justify-center': col.align === 'center',
+                    'justify-start': !col.align || col.align === 'left'
+                  }"
+                >
+                  <span>{{ col.label }}</span>
+                  @if (col.sortable !== false) {
+                    <span class="inline-flex text-slate-500">
+                      @if (sortKey() === col.key) {
+                        @if (sortDirection() === 'asc') {
+                          <app-icon name="arrow-up" customClass="w-3 h-3 text-indigo-400"></app-icon>
+                        } @else {
+                          <app-icon name="arrow-down" customClass="w-3 h-3 text-indigo-400"></app-icon>
+                        }
+                      } @else {
+                        <span class="opacity-20 text-[10px]">↕</span>
+                      }
+                    </span>
+                  }
+                </div>
+              </th>
+            }
+          </tr>
+        </thead>
+
+        <!-- Cuerpo de la Tabla -->
+        <tbody class="divide-y divide-slate-800/60 font-mono">
+          @for (item of displayData(); track trackByFn(item, $index)) {
+            @if (rowTemplate()) {
+              <ng-container
+                *ngTemplateOutlet="rowTemplate()!; context: { $implicit: item, index: $index }"
+              ></ng-container>
+            } @else {
+              <tr
+                (click)="onRowClick(item)"
+                class="hover:bg-slate-800/50 transition cursor-pointer"
+              >
+                @for (col of columns(); track col.key) {
+                  <td
+                    class="px-4 py-3 whitespace-nowrap"
+                    [class]="col.cellClass || ''"
+                    [ngClass]="{
+                      'text-right': col.align === 'right',
+                      'text-center': col.align === 'center'
+                    }"
+                  >
+                    {{ getCellValue(item, col) }}
+                  </td>
+                }
+              </tr>
+            }
+          } @empty {
+            @if (!loading()) {
+              <tr>
+                <td
+                  [attr.colspan]="columns().length || 1"
+                  class="px-6 py-12 text-center text-slate-500 font-sans"
+                >
+                  <div class="flex flex-col items-center justify-center gap-2">
+                    <span class="text-2xl">📋</span>
+                    <p class="text-xs font-medium">{{ emptyMessage() }}</p>
+                    @if (searchQuery()) {
+                      <button
+                        type="button"
+                        (click)="clearSearch()"
+                        class="text-[11px] text-indigo-400 hover:text-indigo-300 underline mt-1"
+                      >
+                        Limpiar filtro de búsqueda
+                      </button>
+                    }
+                  </div>
+                </td>
+              </tr>
+            }
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Barra Inferior de Paginación -->
+    <div class="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 bg-slate-950/80 border-t border-slate-800 text-xs text-slate-400">
+      <!-- Indicador de Registros: "Mostrando X a Y de Z registros" -->
+      <div class="font-mono text-[11px]">
+        @if (totalRecords() > 0) {
+          <span>Mostrando</span>
+          <strong class="text-slate-200 font-bold mx-1">{{ itemRange().start }}</strong>
+          <span>a</span>
+          <strong class="text-slate-200 font-bold mx-1">{{ itemRange().end }}</strong>
+          <span>de</span>
+          <strong class="text-slate-200 font-bold mx-1">{{ itemRange().total }}</strong>
+          <span>registros</span>
+        } @else {
+          <span>0 registros</span>
+        }
+      </div>
+
+      <!-- Controles de Navegación de Páginas -->
+      <div class="flex items-center gap-1 select-none">
+        <!-- Primera Página -->
+        <button
+          type="button"
+          (click)="firstPage()"
+          [disabled]="page() <= 1"
+          class="p-1.5 rounded-lg border border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-800 disabled:opacity-30 disabled:pointer-events-none transition"
+          title="Primera página"
+        >
+          <app-icon name="chevrons-left" customClass="w-3.5 h-3.5"></app-icon>
+        </button>
+
+        <!-- Página Anterior -->
+        <button
+          type="button"
+          (click)="previousPage()"
+          [disabled]="page() <= 1"
+          class="p-1.5 rounded-lg border border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-800 disabled:opacity-30 disabled:pointer-events-none transition"
+          title="Página anterior"
+        >
+          <app-icon name="chevron-left" customClass="w-3.5 h-3.5"></app-icon>
+        </button>
+
+        <!-- Números de Página con Elipsis -->
+        <div class="flex items-center gap-1 px-1">
+          @for (p of visiblePages(); track $index) {
+            @if (p === '...') {
+              <span class="px-2 py-1 text-slate-600 font-mono text-[11px]">...</span>
+            } @else {
+              <button
+                type="button"
+                (click)="goToPage(p)"
+                class="min-w-[28px] h-7 px-2 rounded-lg text-xs font-mono font-medium transition flex items-center justify-center"
+                [ngClass]="{
+                  'bg-indigo-600 text-white font-bold shadow-md shadow-indigo-600/30': p === page(),
+                  'border border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-800': p !== page()
+                }"
+              >
+                {{ p }}
+              </button>
+            }
+          }
+        </div>
+
+        <!-- Página Siguiente -->
+        <button
+          type="button"
+          (click)="nextPage()"
+          [disabled]="page() >= totalPages()"
+          class="p-1.5 rounded-lg border border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-800 disabled:opacity-30 disabled:pointer-events-none transition"
+          title="Página siguiente"
+        >
+          <app-icon name="chevron-right" customClass="w-3.5 h-3.5"></app-icon>
+        </button>
+
+        <!-- Última Página -->
+        <button
+          type="button"
+          (click)="lastPage()"
+          [disabled]="page() >= totalPages()"
+          class="p-1.5 rounded-lg border border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-800 disabled:opacity-30 disabled:pointer-events-none transition"
+          title="Última página"
+        >
+          <app-icon name="chevrons-right" customClass="w-3.5 h-3.5"></app-icon>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

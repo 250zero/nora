@@ -13,14 +13,34 @@
       </div>
     </div>
 
-    <!-- Indicador de rol activo y botón de refresco -->
-    <div class="flex items-center gap-3">
+    <!-- Indicador de rol activo, selector de vista y botón de refresco -->
+    <div class="flex items-center gap-2">
+      <!-- Selector de Vista: Tarjetas vs Tabla -->
+      <div class="flex items-center bg-slate-900 p-0.5 rounded-lg border border-slate-800">
+        <button
+          type="button"
+          (click)="viewMode.set('grid')"
+          class="px-2.5 py-1 text-xs font-medium rounded-md transition"
+          [class]="viewMode() === 'grid' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'"
+        >
+          Tarjetas
+        </button>
+        <button
+          type="button"
+          (click)="viewMode.set('table')"
+          class="px-2.5 py-1 text-xs font-medium rounded-md transition"
+          [class]="viewMode() === 'table' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'"
+        >
+          Tabla
+        </button>
+      </div>
+
       <button
         (click)="loadUsers()"
-        class="inline-flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium rounded-lg border border-slate-700 transition"
+        class="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium rounded-lg border border-slate-700 transition"
       >
         <app-icon name="clock-time" customClass="w-3.5 h-3.5"></app-icon>
-        <span>Actualizar</span>
+        <span class="hidden sm:inline">Actualizar</span>
       </button>
     </div>
   </div>
@@ -54,26 +74,104 @@
       <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-400"></div>
     </div>
   } @else {
-    <!-- Grid de colaboradores -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      @for (u of users(); track u.id) {
-        <div class="bg-slate-900 border border-slate-800 hover:border-slate-700/80 rounded-xl p-5 flex flex-col justify-between transition-all">
-          <div>
-            <!-- Top info -->
-            <div class="flex items-start justify-between gap-3 mb-3">
-              <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-sm text-indigo-400">
-                  {{ u.display_name.charAt(0).toUpperCase() }}
+    @if (viewMode() === 'grid') {
+      <!-- Grid de colaboradores -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        @for (u of users(); track u.id) {
+          <div class="bg-slate-900 border border-slate-800 hover:border-slate-700/80 rounded-xl p-5 flex flex-col justify-between transition-all">
+            <div>
+              <!-- Top info -->
+              <div class="flex items-start justify-between gap-3 mb-3">
+                <div class="flex items-center gap-3">
+                  <div class="w-10 h-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-sm text-indigo-400">
+                    {{ u.display_name.charAt(0).toUpperCase() }}
+                  </div>
+                  <div>
+                    <h3 class="font-semibold text-slate-200 text-sm leading-tight">{{ u.display_name }}</h3>
+                    <p class="text-xs text-slate-400 truncate max-w-[160px]">{{ u.email }}</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 class="font-semibold text-slate-200 text-sm leading-tight">{{ u.display_name }}</h3>
-                  <p class="text-xs text-slate-400 truncate max-w-[160px]">{{ u.email }}</p>
-                </div>
+
+                <!-- Badge de rol -->
+                <span
+                  class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold tracking-wide uppercase"
+                  [ngClass]="{
+                    'bg-purple-500/10 text-purple-300 border border-purple-500/20': u.role === 2,
+                    'bg-slate-800 text-slate-300 border border-slate-700': u.role === 1
+                  }"
+                >
+                  {{ u.role_label }}
+                </span>
               </div>
 
-              <!-- Badge de rol -->
+              <!-- Métricas de tareas -->
+              <div class="grid grid-cols-3 gap-2 my-4 p-3 bg-slate-950/60 rounded-lg border border-slate-800/80 text-center">
+                <div>
+                  <p class="text-[10px] uppercase font-bold tracking-wider text-slate-500">Total</p>
+                  <p class="text-base font-extrabold text-slate-200 mt-0.5">{{ u.tasks_stats.total }}</p>
+                </div>
+                <div>
+                  <p class="text-[10px] uppercase font-bold tracking-wider text-amber-500">Pendientes</p>
+                  <p class="text-base font-extrabold text-amber-300 mt-0.5">{{ u.tasks_stats.pending }}</p>
+                </div>
+                <div>
+                  <p class="text-[10px] uppercase font-bold tracking-wider text-emerald-500">Listas</p>
+                  <p class="text-base font-extrabold text-emerald-300 mt-0.5">{{ u.tasks_stats.completed }}</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Acciones -->
+            <div class="pt-3 border-t border-slate-800/80 flex items-center justify-between gap-2">
+              <button
+                (click)="viewUserTasks(u)"
+                class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-400 hover:text-indigo-300 text-xs font-medium rounded-lg border border-indigo-500/20 transition"
+              >
+                <app-icon name="calendar-agenda" customClass="w-3.5 h-3.5"></app-icon>
+                <span>Ver tareas ({{ u.tasks_stats.total }})</span>
+              </button>
+
+              <!-- Botón de borrado crítico con modal de advertencia -->
+              <button
+                (click)="promptDeleteUser(u, $event)"
+                class="p-2 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-lg border border-transparent hover:border-rose-500/20 transition"
+                title="Eliminar usuario y todas sus tareas en cascada"
+              >
+                <app-icon name="trash-delete" customClass="w-4 h-4"></app-icon>
+              </button>
+            </div>
+          </div>
+        }
+      </div>
+    } @else {
+      <!-- Vista Tabla con Datatable Compartido (Paginación: 5, 10, 15, 50, 100) -->
+      <app-data-table
+        [data]="users()"
+        [columns]="userColumns"
+        [pageSizeOptions]="[5, 10, 15, 50, 100]"
+        [pageSize]="10"
+        [loading]="loading()"
+        [searchable]="true"
+        [searchPlaceholder]="'Buscar por nombre, email o rol...'"
+        [emptyMessage]="'No se encontraron colaboradores.'"
+        [rowTemplate]="userRowTemplate"
+      >
+        <ng-template #userRowTemplate let-u let-index="index">
+          <tr class="hover:bg-slate-800/40 transition">
+            <td class="px-4 py-3 whitespace-nowrap">
+              <div class="flex items-center gap-2.5">
+                <div class="w-7 h-7 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-xs text-indigo-400">
+                  {{ u.display_name.charAt(0).toUpperCase() }}
+                </div>
+                <span class="font-bold text-slate-200">{{ u.display_name }}</span>
+              </div>
+            </td>
+            <td class="px-4 py-3 whitespace-nowrap text-slate-400">
+              {{ u.email }}
+            </td>
+            <td class="px-4 py-3 whitespace-nowrap">
               <span
-                class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold tracking-wide uppercase"
+                class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide"
                 [ngClass]="{
                   'bg-purple-500/10 text-purple-300 border border-purple-500/20': u.role === 2,
                   'bg-slate-800 text-slate-300 border border-slate-700': u.role === 1
@@ -81,47 +179,42 @@
               >
                 {{ u.role_label }}
               </span>
-            </div>
-
-            <!-- Métricas de tareas -->
-            <div class="grid grid-cols-3 gap-2 my-4 p-3 bg-slate-950/60 rounded-lg border border-slate-800/80 text-center">
-              <div>
-                <p class="text-[10px] uppercase font-bold tracking-wider text-slate-500">Total</p>
-                <p class="text-base font-extrabold text-slate-200 mt-0.5">{{ u.tasks_stats.total }}</p>
+            </td>
+            <td class="px-4 py-3 whitespace-nowrap font-mono text-xs">
+              <span class="text-amber-400 font-bold" title="Pendientes">{{ u.tasks_stats.pending }}</span>
+              <span class="text-slate-600 mx-1">/</span>
+              <span class="text-emerald-400 font-bold" title="Completadas">{{ u.tasks_stats.completed }}</span>
+              <span class="text-slate-600 mx-1">/</span>
+              <span class="text-slate-300" title="Total">{{ u.tasks_stats.total }}</span>
+            </td>
+            <td class="px-4 py-3 whitespace-nowrap text-slate-500 font-mono text-[11px]">
+              {{ u.created_at | date:'yyyy-MM-dd' }}
+            </td>
+            <td class="px-4 py-3 whitespace-nowrap text-right">
+              <div class="flex items-center justify-end gap-1.5">
+                <button
+                  type="button"
+                  (click)="viewUserTasks(u)"
+                  class="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-400 text-xs font-medium rounded-lg border border-indigo-500/20 transition"
+                  title="Ver tareas"
+                >
+                  <app-icon name="calendar-agenda" customClass="w-3 h-3"></app-icon>
+                  <span>Tareas</span>
+                </button>
+                <button
+                  type="button"
+                  (click)="promptDeleteUser(u, $event)"
+                  class="p-1.5 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-lg transition"
+                  title="Eliminar usuario"
+                >
+                  <app-icon name="trash-delete" customClass="w-3.5 h-3.5"></app-icon>
+                </button>
               </div>
-              <div>
-                <p class="text-[10px] uppercase font-bold tracking-wider text-amber-500">Pendientes</p>
-                <p class="text-base font-extrabold text-amber-300 mt-0.5">{{ u.tasks_stats.pending }}</p>
-              </div>
-              <div>
-                <p class="text-[10px] uppercase font-bold tracking-wider text-emerald-500">Listas</p>
-                <p class="text-base font-extrabold text-emerald-300 mt-0.5">{{ u.tasks_stats.completed }}</p>
-              </div>
-            </div>
-          </div>
-
-          <!-- Acciones -->
-          <div class="pt-3 border-t border-slate-800/80 flex items-center justify-between gap-2">
-            <button
-              (click)="viewUserTasks(u)"
-              class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-400 hover:text-indigo-300 text-xs font-medium rounded-lg border border-indigo-500/20 transition"
-            >
-              <app-icon name="calendar-agenda" customClass="w-3.5 h-3.5"></app-icon>
-              <span>Ver tareas ({{ u.tasks_stats.total }})</span>
-            </button>
-
-            <!-- Botón de borrado crítico con modal de advertencia -->
-            <button
-              (click)="promptDeleteUser(u, $event)"
-              class="p-2 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-lg border border-transparent hover:border-rose-500/20 transition"
-              title="Eliminar usuario y todas sus tareas en cascada"
-            >
-              <app-icon name="trash-delete" customClass="w-4 h-4"></app-icon>
-            </button>
-          </div>
-        </div>
-      }
-    </div>
+            </td>
+          </tr>
+        </ng-template>
+      </app-data-table>
+    }
   }
 
   <!-- Drawer / Panel de Drill-down de tareas del colaborador seleccionado -->

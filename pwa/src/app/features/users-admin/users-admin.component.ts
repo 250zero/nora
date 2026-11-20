@@ -3,6 +3,7 @@ import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@ang
 import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { AppIconComponent } from '../../shared/components/app-icon/app-icon.component';
+import { DataTableComponent, DataTableColumn } from '../../shared/components/data-table';
 
 export interface UserListItem {
   id: string;
@@ -34,7 +35,7 @@ export interface UserTaskItem {
 @Component({
   selector: 'app-users-admin',
   standalone: true,
-  imports: [CommonModule, AppIconComponent],
+  imports: [CommonModule, AppIconComponent, DataTableComponent],
   templateUrl: './users-admin.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -45,6 +46,19 @@ export class UsersAdminComponent implements OnInit {
   readonly users = signal<UserListItem[]>([]);
   readonly loading = signal<boolean>(false);
   readonly error = signal<string | null>(null);
+
+  // Selector de vista: Cuadrícula de Tarjetas vs Tabla con Datatable
+  readonly viewMode = signal<'grid' | 'table'>('grid');
+
+  // Columnas tipadas para el DataTable de Usuarios
+  readonly userColumns: DataTableColumn<UserListItem>[] = [
+    { key: 'display_name', label: 'Colaborador', sortable: true },
+    { key: 'email', label: 'Correo Electrónico', sortable: true },
+    { key: 'role_label', label: 'Rol', sortable: true, width: '120px' },
+    { key: 'tasks_stats', label: 'Tareas (Pend / Comp / Total)', sortable: false, width: '200px' },
+    { key: 'created_at', label: 'Fecha Registro', sortable: true, width: '140px' },
+    { key: 'id', label: 'Acciones', sortable: false, align: 'right', width: '140px' },
+  ];
 
   // Drill-down de tareas por colaborador
   readonly selectedUser = signal<UserListItem | null>(null);
