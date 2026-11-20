@@ -304,20 +304,44 @@ curl -s http://127.0.0.1:3001/api/health
 
 ---
 
-## 🔮 9. Roadmap de Producto y Futuros Features
+## 🔮 9. Roadmap de Producto y Futuros Features (Pendientes Identificados)
 
-Para las próximas versiones de la plataforma Nora se proyectan las siguientes extensiones funcionales clave:
-1. **Etiquetas y Proyectos Jerárquicos N:M:** Soporte para categorizar tareas por proyectos, clientes o áreas de negocio con tableros Kanban interactivos y filtros combinados.
-2. **Interacción y Dictado por Voz (Web Speech API & Whisper):** Agendamiento y consultas por voz con reconocimiento en lenguaje natural y síntesis de audio de las respuestas de Nora en tiempo real.
-3. **Notificaciones Push Proactivas (Web Push VAPID / WhatsApp / Telegram):** Envío automático de recordatorios antes del inicio de reuniones o vencimiento de tareas críticas, así como avisos de reasignación.
-4. **Sincronización Bidireccional de Calendarios (Google Calendar, Outlook, Apple Calendar):** Integración nativa vía protocolos CalDAV y APIs de Google/Microsoft con sincronización de eventos en dos direcciones.
-5. **Briefing Ejecutivo Matutino con IA:** Generación automatizada de un resumen ejecutivo diario al iniciar la jornada (vía email o mensaje interactivo en la app) con las prioridades, horas pico y recomendaciones de enfoque.
-6. **Agendamiento Grupal Inteligente:** Detección automática de disponibilidad cruzada entre múltiples colaboradores para sugerir la franja horaria óptima sin colisiones de agenda.
+### Pendientes Funcionales del Alcance (Backlog Priorizado):
+1. **Pestaña de Auto-Registro en Login (`RF-01` UI):** Añadir un selector *"Iniciar Sesión / Registrarse"* en `pwa/src/app/features/auth/login.component.html` conectado al endpoint ya implementado `POST /api/auth/register` en Supabase Auth.
+2. **Botón y Modal de Creación Manual de Tareas (`RF-05` UI):** Incorporar en la vista de Agenda un botón *"+ Nueva Tarea"* con formulario directo (título, fecha, hora, prioridad, responsable) validado por campo, complementando el modelo AI-First conversacional y el modal de edición existente (`POST /api/tasks` ya activo en backend).
+3. **Service Worker Activo y App Icons PNG 192/512 (`RF-23`, `RF-24`):** Registrar un Service Worker (`sw.js` o `@angular/pwa`) para caché estática del App Shell cuando se abra sin red desde cero, junto con iconos PNG rasterizados dedicados `192x192` y `512x512` además del SVG actual.
+4. **Etiquetas y Proyectos Jerárquicos N:M (`RF-11`):** Soporte para categorizar tareas por proyectos o áreas con tableros Kanban y filtros por etiqueta.
+5. **Interacción y Dictado por Voz (`RF-21` - Web Speech API & Whisper):** Conectar el ícono `mic-voice.svg` en el chat de Nora para dictado en lenguaje natural en tiempo real.
+6. **Notificaciones Push Proactivas (`RF-26` - Web Push VAPID / WhatsApp):** Recordatorios antes de reuniones, vencimientos de tareas críticas y avisos de reasignación.
+
+### Evolución Corporativa de Producto:
+7. **Sincronización Bidireccional de Calendarios (Google Calendar, Outlook, Apple Calendar):** Integración nativa vía protocolos CalDAV y APIs oficiales.
+8. **Briefing Ejecutivo Matutino y Agendamiento Grupal Inteligente:** Resumen diario de prioridades y cruce automático de disponibilidad entre colaboradores.
 
 ---
 
-## ⚡ 10. Mejoras Posibles y Optimizaciones de Arquitectura
+## ⚡ 10. Mejoras Posibles, Auditoría de Seguridad y Optimizaciones de Arquitectura
 
+### 🛡️ Hallazgos de la Auditoría de Seguridad y Puntos de Mejora (Hardening):
+Tras auditar el backend Deno (`auth`, `tasks`, `chat`, `audit.middleware.ts`, `supabase.ts`), la capa PWA y las migraciones SQL RLS, se documentan los siguientes hallazgos críticos y su plan de remediación:
+
+1. **SEC-N01 — Eliminación del Fallback `X-User-Id` y Verificación Criptográfica de JWT en Middleware:**
+   - *Hallazgo actual:* `extractUserIdFromRequest()` (`backend/src/config/supabase.ts`) decodifica el payload Base64 del JWT sin validar firma en la capa Deno (delegando la validación a PostgREST), y además admite el header no firmado `X-User-Id` como último recurso. Aunque en rutas principales PostgREST rechaza tokens inválidos y RLS exige `auth.uid()`, endpoints que dependan solo de `extractUserIdFromRequest` o registros de `auditMiddleware` podrían aceptar un `X-User-Id` forjado.
+   - *Mejora obligatoria:* Eliminar completamente la lectura de `X-User-Id` y validar criptográficamente todos los JWT entrantes (contra JWKS de Supabase o `supabase.auth.getUser(token)`) en un middleware global de autenticación antes de ejecutar cualquier ruta protegida.
+2. **SEC-N02 — Sanitización Estricta contra Inyección de Filtros PostgREST (`.or(...)`):**
+   - *Hallazgo actual:* En `backend/src/routes/tasks.route.ts` y `findMatchingTasks()` de `backend/src/services/gemini.service.ts`, el query parameter `user_id` y los términos de búsqueda se interpolan directamente en cadenas `.or(\`title.ilike.%${term}%,...\`)` sin escapar comas ni paréntesis.
+   - *Mejora obligatoria:* Validar `user_id` con `z.string().uuid()` y sanitizar/escapar cualquier carácter reservado de PostgREST (`,`, `.`, `(`, `)`) antes de construir filtros dinámicos, o migrar las búsquedas híbridas a funciones RPC parametrizadas en PostgreSQL.
+3. **SEC-N03 — Prevención de Escalamiento de Rol por Patrón de Correo en `handle_new_user()`:**
+   - *Hallazgo actual:* La función trigger `public.handle_new_user()` definida en `supabase/migrations/0006_security_rls_hardening.sql` asigna automáticamente `role = 2 (Supervisor)` si `new.email ilike '%supervisor%' or new.email ilike '%ana@%'`. En un entorno abierto de registro público, un atacante podría registrar un correo como `mi_supervisor@dominio.com` y obtener privilegios de Supervisor al instante.
+   - *Mejora obligatoria:* Remover la heurística basada en patrones de email para que todo auto-registro público nazca estrictamente con `role = 1 (Miembro)`, permitiendo promociones a Supervisor únicamente mediante una función administrativa ejecutada por un Supervisor existente autenticado.
+4. **SEC-N04 — Rate Limiting en `/api/chat` / Auth y Guardrails Anti-Prompt Injection:**
+   - *Hallazgo actual:* No existe limitación de peticiones por minuto hacia `/api/chat` ni `/api/auth/login`, exponiendo la cuota de Google Gemini a agotamiento y las cuentas a ataques de fuerza bruta. Adicionalmente, los títulos/descripciones almacenados en tareas de equipo entran al contexto de herramientas de Gemini sin delimitación explícita.
+   - *Mejora obligatoria:* Agregar middleware de Rate Limiting por usuario/IP, cuotas diarias de tokens en Gemini y delimitación estructurada de datos de usuario (*untrusted data fencing*) en el `systemInstruction` del agente.
+5. **SEC-N05 — Lista Blanca Exacta de CORS, Migración a Cookies `HttpOnly` y Sanitización Completa de Auditoría:**
+   - *Hallazgo actual:* `backend/main.ts` autoriza CORS evaluando `origin.includes("vis7ar.com")` (vulnerable a dominios trampa que incluyan ese texto), los tokens se guardan en `localStorage` y `auditMiddleware` intenta hacer `c.req.json()` sin validar `Content-Type: application/json`.
+   - *Mejora obligatoria:* Usar coincidencia exacta o regex anclado para orígenes permitidos, migrar JWTs hacia cookies `HttpOnly; Secure; SameSite=Strict` con cabeceras `CSP`/`HSTS`, y condicionar el parseo de auditoría estrictamente a `application/json`.
+
+### ⚙️ Optimizaciones de Arquitectura y Escalabilidad:
 1. **Streaming en Tiempo Real (Server-Sent Events / WebSockets):** Transmisión token a token de las respuestas del asistente Nora en el chat para reducir la percepción de latencia y mejorar la fluidez de interacción.
 2. **Memoria Semántica a Largo Plazo con RAG Vectorial (`pgvector`):** Indexación vectorial del historial de conversaciones, notas corporativas y proyectos pasados para que Nora recuerde contexto extendido y preferencias del usuario.
 3. **Caché en Memoria y Rate Limiting Adaptativo (Redis / Upstash):** Protección de cuotas de la API de Google Gemini, aceleración de consultas recurrentes de agenda y limitación inteligente de peticiones por usuario.
