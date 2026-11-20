@@ -5,10 +5,12 @@ import {
   computed,
   inject,
   OnInit,
+  signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Task } from '../../core/models/task.model';
 import { AuthService } from '../../core/services/auth.service';
+import { ApiService } from '../../core/services/api.service';
 import { CalendarViewType, TaskStore } from '../../core/stores/task.store';
 import { AppIconComponent } from '../../shared/components/app-icon/app-icon.component';
 import { TaskDetailModalComponent } from '../../shared/components/task-detail-modal/task-detail-modal.component';
@@ -32,12 +34,28 @@ interface CalendarDay {
 export class AgendaComponent implements OnInit {
   protected readonly store = inject(TaskStore);
   protected readonly auth = inject(AuthService);
+  private readonly api = inject(ApiService);
 
   readonly daysOfWeek = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
   readonly hoursOfDay = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
 
+  // Lista dinámica de usuarios para el filtro de Supervisor
+  readonly teamMembers = signal<Array<{ id: string; display_name: string; email: string; role_label: string }>>([]);
+
   ngOnInit(): void {
     this.store.loadTasks();
+    if (this.auth.isSupervisor()) {
+      this.loadTeamMembers();
+    }
+  }
+
+  loadTeamMembers(): void {
+    this.api.get<{ users: any[] }>('users').subscribe({
+      next: (res) => {
+        this.teamMembers.set(res.users || []);
+      },
+      error: () => {},
+    });
   }
 
   // Título del mes actual (ej: "Noviembre 2026")

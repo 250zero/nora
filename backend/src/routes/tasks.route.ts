@@ -8,13 +8,25 @@ export const tasksRouter = new Hono();
 const taskSchema = z.object({
   title: z.string().min(1, "El título es obligatorio").max(200),
   description: z.string().max(2000).optional().nullable(),
-  due_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Formato debe ser YYYY-MM-DD").optional().nullable(),
-  due_time: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/, "Formato debe ser HH:mm o HH:mm:ss").optional().nullable(),
+  due_date: z
+    .string()
+    .optional()
+    .nullable()
+    .transform((val) => (val && val.trim() !== "" ? val : null)),
+  due_time: z
+    .string()
+    .optional()
+    .nullable()
+    .transform((val) => {
+      if (!val || val.trim() === "") return null;
+      return val.length === 5 ? `${val}:00` : val;
+    }),
   priority: z.union([z.literal(1), z.literal(2), z.literal(3)]).default(2),
   status: z.union([z.literal(1), z.literal(2), z.literal(3)]).default(1),
   responsible_name: z.string().max(80).optional().nullable(),
   source: z.union([z.literal(1), z.literal(2)]).default(1),
   assignee_id: z.string().uuid().optional().nullable(),
+  owner_id: z.string().uuid().optional().nullable(),
 });
 
 // GET /api/tasks — Listado de tareas con filtros
@@ -225,12 +237,14 @@ tasksRouter.put("/:id", async (c: Context) => {
   }
 });
 
-// DELETE /api/tasks/:id — Eliminar tarea (Solo el creador puede eliminar su propia tarea)
+// DELETE /api/tasks/:id — Eliminar tarea (Solo el creador o un supervisor pueden eliminar)
 tasksRouter.delete("/:id", async (c: Context) => {
   const taskId = c.req.param("id");
   const currentUserId = c.req.header("X-User-Id");
+  const activeRole = Number(c.req.header("X-Active-Role")) || 1;
+  const isSupervisor = activeRole === 2;
 
-  if (!currentUserId) {
+  if (!currentUserId && !isSupervisor) {
     return c.json({ error: "No se proporcionó la identidad del usuario (X-User-Id requerido)" }, 401);
   }
 
@@ -245,21 +259,22 @@ tasksRouter.delete("/:id", async (c: Context) => {
     return c.json({ error: "Tarea no encontrada" }, 404);
   }
 
-  // 2. Verificar que quien intenta eliminar sea exactamente el creador
-  if (task.owner_id !== currentUserId) {
+  // 2. Verificar que quien intenta eliminar sea el creador O un supervisor
+  if (task.owner_id !== currentUserId && !isSupervisor) {
     return c.json({
-      error: "Acceso denegado: solo puedes eliminar las tareas que tú mismo has creado.",
+      error: "Acceso denegado: solo el creador o un supervisor pueden eliminar esta tarea.",
       task_owner_id: task.owner_id,
       request_user_id: currentUserId,
     }, 403);
   }
 
   // 3. Proceder con el borrado
-  const { error: deleteError } = await supabase
-    .from("tasks")
-    .delete()
-    .eq("id", taskId)
-    .eq("owner_id", currentUserId);
+  let deleteQuery = supabase.from("tasks").delete().eq("id", taskId);
+  if (!isSupervisor) {
+    deleteQuery = deleteQuery.eq("owner_id", currentUserId);
+  }
+
+  const { error: deleteError } = await deleteQuery;
 
   if (deleteError) {
     return c.json({ error: deleteError.message }, 500);

@@ -94,14 +94,18 @@ export class TaskStore {
     this.isLoading.set(true);
     this.errorMessage.set(null);
 
-    const year = this.selectedDate().getFullYear();
-    const month = this.selectedDate().getMonth() + 1;
+    const params: Record<string, string> = {};
+    const filterUser = this.filterUserId();
+    if (filterUser) {
+      params['user_id'] = filterUser;
+    }
+    const query = this.searchQuery();
+    if (query) {
+      params['search'] = query;
+    }
 
     this.api
-      .get<{ tasks: Task[] }>('tasks', {
-        user_id: this.filterUserId() || '',
-        search: this.searchQuery() || '',
-      })
+      .get<{ tasks: Task[] }>('tasks', params)
       .subscribe({
         next: (res) => {
           const list = res.tasks || [];

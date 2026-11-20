@@ -94,11 +94,14 @@
       <select
         [ngModel]="store.filterUserId()"
         (ngModelChange)="store.filterUserId.set($event); store.loadTasks()"
-        class="bg-slate-900 border border-amber-800/80 rounded-lg px-2 py-1 text-xs text-amber-200 focus:outline-none"
+        class="bg-slate-900 border border-amber-800/80 rounded-lg px-2.5 py-1 text-xs text-amber-200 focus:outline-none cursor-pointer"
       >
         <option [ngValue]="null">Ver tareas de todo el equipo</option>
-        <option value="a0000000-0000-0000-0000-000000000001">Juan Pérez (Colaborador)</option>
-        <option value="a0000000-0000-0000-0000-000000000002">Ana Gómez (Supervisor)</option>
+        @for (member of teamMembers(); track member.id) {
+          <option [value]="member.id">
+            {{ member.display_name }} ({{ member.role_label }})
+          </option>
+        }
       </select>
     </div>
   }
